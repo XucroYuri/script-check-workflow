@@ -1,6 +1,8 @@
-# script-check-workflow
+# AI可执行剧本检查表V3
 
-`script-check-workflow` 是一个面向 AI 可执行剧本的 Agent Skill，用于对 AI 视频、动画、分镜执行剧本做 7-stage 线性检查、纠正与标准化输出。
+`AI可执行剧本检查表V3` 是一个面向 AI 可执行剧本的 Agent Skill，用于对 AI 视频、动画、分镜执行剧本做 7-stage 线性检查、纠正与标准化输出。
+
+仓库 slug 与内部 skill ID 仍然保持为 `script-check-workflow`，用于安装路径、兼容目录和 `$script-check-workflow` 触发调用。
 
 它不是文学评论器，也不是故事优劣打分器。它的目标是把剧本翻译成更适合导演、分镜、AI 生成、制作协作与工业化验收的标准化执行文档。
 
@@ -237,7 +239,7 @@ git clone "$REPO_URL" ~/.openclaw/skills/script-check-workflow
 Use $script-check-workflow to 解释这个技能会输出什么，以及什么时候进入说明模式。
 ```
 
-如果工具支持列出技能，也应该能看到 `script-check-workflow` 或对应的展示名称 `剧本检查表`。
+如果工具支持列出技能，也应该能看到内部 ID `script-check-workflow`，或对应的展示名称 `AI可执行剧本检查表V3`。
 
 ## 仓库内的重要文档
 

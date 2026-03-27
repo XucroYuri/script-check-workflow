@@ -12,7 +12,7 @@
 
 ## 产物总览
 
-`剧本检查表` 的默认产物永远是两份 Markdown 文档：
+`AI可执行剧本检查表V3` 的默认产物永远是两份 Markdown 文档：
 
 1. `standardized-script`
 2. `diagnostics-record`

@@ -1,4 +1,4 @@
 interface:
-  display_name: "剧本检查表"
-  short_description: "7阶段AI剧本检查、诊断、改稿与标准化双产物工作流"
+  display_name: "AI可执行剧本检查表V3"
+  short_description: "V3版7阶段AI剧本检查、诊断、改稿与标准化双产物工作流"
   default_prompt: "Use $script-check-workflow to 检查、诊断并标准化这份 AI 可执行剧本。"
