@@ -25,6 +25,13 @@
 from_stage4:
   action_complexity: N.N
   interaction_risk_count: N
+from_stage4_5:
+  continuity_risk_count:
+    high: N
+    medium: N
+    low: N
+  suggested_visual_anchor_updates:
+    - {asset: "资产名", location: "SCENE/镜头", reason: "应作为视觉锚点或负向约束的原因"}
 from_stage3:
   shot_count: N
 ```
@@ -84,6 +91,12 @@ from_stage3:
 1. 识别剧本中的关键视觉元素
 2. 确保每个视觉钉子在首次出现后至少每3镜重复一次
 3. 对只出现一次的关键元素标注"缺少重复提醒"
+
+### Stage 4.5 连续性输入使用说明
+
+如果 Stage 4.5 输出 `suggested_visual_anchor_updates`，Stage 5 应检查这些资产是否需要成为视觉钉子或负向约束。
+
+注意：Stage 5 只使用 Stage 4.5 的精简 metrics，不接收完整推断链。中高风险且需要编剧确认的内容，不得当成已确认事实写入 AI 生成约束。
 
 ---
 

@@ -11,7 +11,7 @@
 | 规则编号 | 规则名称 | 检查焦点 |
 |----------|----------|----------|
 | R7.34 | 格式统一 | Scene/镜头/台词格式是否一致 |
-| R7.35 | 团队接力 | 导演/分镜/美术/动画/AI各岗位能否直接使用 |
+| R7.35 | 团队接力 | 导演/分镜/美术/动画/AI 能否直接使用，编剧/场记交接信息是否清楚 |
 | R7.36 | 镜头验收 | 每镜是否有可对照的验收标准 |
 | R7.37 | AI验收四问 | 生成后的四项快速验收 |
 
@@ -23,6 +23,10 @@ all_previous_metrics_summary:
   stage2_pass_rate: 0.XX
   stage3_pass_rate: 0.XX
   stage4_pass_rate: 0.XX
+  stage4_5_pass_rate: 0.XX
+  continuity_risk_high: N
+  continuity_risk_total: N
+  requires_writer_confirmation_count: N
   stage5_pass_rate: 0.XX
   stage6_pass_rate: 0.XX
   total_high_findings: N
@@ -67,7 +71,7 @@ SFX / UI / 屏显
 
 ## 规则R7.35: 是否方便团队接力
 
-### 检查项（五岗位验证）
+### 检查项（岗位与交接验证）
 
 | 岗位 | 检查标准 |
 |------|----------|
@@ -76,6 +80,7 @@ SFX / UI / 屏显
 | **美术** | 美术能抓到空间、道具、氛围来源 |
 | **动画** | 动画能抓到主体动作和节奏重点 |
 | **AI生成** | AI能稳定抓住主体、动作和视觉钉子 |
+| **编剧/场记交接** | `asset-continuity-ledger` 是否明确列出角色、场景、道具的状态继承、待确认项和下游制作提示 |
 
 ### 纠正方法
 
@@ -85,6 +90,7 @@ SFX / UI / 屏显
 - 美术抓不到 → 缺少环境锚点
 - 动画抓不到 → 动作描述不具体
 - AI抓不住 → 主体/锚点不明确
+- 连续性账本缺失或待确认项过多 → 标注需编剧优先确认的资产状态问题
 
 ---
 
@@ -124,12 +130,13 @@ SFX / UI / 屏显
 ```yaml
 stage7_metrics:
   format_consistency: 0.XX        # 格式一致性评分
-  team_handoff_score:             # 五岗位接力评分
+  team_handoff_score:             # 岗位与交接评分
     director: 0.XX
     storyboard: 0.XX
     art: 0.XX
     animation: 0.XX
     ai_generation: 0.XX
+    continuity_handoff: 0.XX
   acceptance_readiness: 0.XX      # 验收就绪度
   findings_count:
     high: N

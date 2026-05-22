@@ -9,18 +9,20 @@
 ## 这个 Skill 做什么
 
 - 保留固定的 7-stage 检查流程、评分逻辑、终审 12 问和层间隔离原则
-- 在输入为剧本文本、剧本文件路径、剧本附件、单场景或单镜原稿时，默认输出双产物
+- 在输入为剧本文本、剧本文件路径、剧本附件、单场景或单镜原稿时，默认输出三产物
 - 支持全量检查、指定 Stage 检查、单镜检查和复查
 - 在只问规则、评分、阶段说明时进入说明模式，不强制生成文档
 
-## 默认双产物
+## 默认三产物
 
-当输入的是剧本而不是规则咨询时，默认输出两份 Markdown 文档：
+当输入的是剧本而不是规则咨询时，默认输出三份 Markdown 文档：
 
 1. `standardized-script`
    基于 [`assets/template-standard-format.md`](assets/template-standard-format.md) 生成的标准剧本文档，不混入评分、批注、诊断说明或过程性注释。
 2. `diagnostics-record`
    高细粒度诊断记录，至少包含运行范围、总分与评级、各 Stage 摘要、逐条问题、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审 12 问结果和复查建议。
+3. `asset-continuity-ledger`
+   面向编剧的角色、场景、道具连续性状态账本，用于提示隐含状态变化、跳跃式再出现风险、编剧待确认项和多方案补写建议。
 
 命名规则、范围行为与交付约束见 [`references/output-artifacts.md`](references/output-artifacts.md)。
 
@@ -29,6 +31,7 @@
 - 画面层目标是 `0 心理词 / 0 主观意图 / 0 代词`
 - 情绪与表演提示必须隔离在台词专属区域
 - Stage 间通过精简 metrics 传递，不直接互相污染 findings
+- Stage 4.5 资产连续性追踪层用于输出编剧友好的状态账本；低风险物理连续性可补入标准稿，中高风险创作判断必须留给编剧确认
 - 不用检查报告替代标准剧本文档
 
 ## 仓库结构
@@ -245,7 +248,7 @@ Use $script-check-workflow to 解释这个技能会输出什么，以及什么�
 
 - [`SKILL.md`](SKILL.md)：skill 主入口，定义触发条件、执行流程与默认输出行为
 - [`agents/openai.yaml`](agents/openai.yaml)：给支持 UI 元数据的工具使用
-- [`references/output-artifacts.md`](references/output-artifacts.md)：双产物的 schema、命名规则、范围策略
+- [`references/output-artifacts.md`](references/output-artifacts.md)：三产物的 schema、命名和交付规则
 - [`references/scoring-criteria.md`](references/scoring-criteria.md)：评分聚合规则
 - [`references/handoff-protocol.md`](references/handoff-protocol.md)：Stage 之间如何通过精简 metrics 传递信息
 - [`references/stage1-principles.md`](references/stage1-principles.md) 到 [`references/stage7-industrial.md`](references/stage7-industrial.md)：7 个阶段的规则正文
