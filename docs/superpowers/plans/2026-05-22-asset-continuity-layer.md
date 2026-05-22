@@ -641,7 +641,6 @@ In `references/output-artifacts.md`, add this section after `diagnostics-record`
 2. 中高风险项必须标注 `编剧待确认`。
 3. 不把人物心理、剧情含义、悬念结构推断写成事实。
 4. 不把账本内容混入 `standardized-script`。
-```
 ````
 
 - [ ] **Step 5: Update range rules**
