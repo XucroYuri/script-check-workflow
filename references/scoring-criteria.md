@@ -15,6 +15,21 @@
 
 ---
 
+## Stage 4.5 非计分说明
+
+Stage 4.5 资产连续性追踪层是非计分连续性风险层，不改变总分 100 分权重。
+
+它的作用是：
+
+1. 输出 `asset-continuity-ledger`
+2. 将连续性 findings 写入 `diagnostics-record`
+3. 将低风险连续性补写提供给 `standardized-script`
+4. 将精简 metrics 传递给 Stage 5 和 Stage 7
+
+Stage 4.5 的 `pass_rate` 可用于诊断摘要和复查优先级，但不直接参与总分计算。
+
+---
+
 ## 各Stage评分细则
 
 ### Stage 1 总原则（25分）

@@ -9,6 +9,7 @@
 1. **只传metrics，不传findings**：下游Stage不知道上游发现了什么问题
 2. **metrics总量≤200 token**：防止上游信息膨胀污染下游判断
 3. **只传该Stage声明需要的字段**：按prerequisite contract严格过滤
+4. **Stage 4.5只传连续性metrics，不传完整账本**：下游Stage可以使用连续性风险数量、视觉锚点更新和待确认数量，但不接收完整推断链，避免把编剧待确认内容误当事实。
 
 ---
 
@@ -46,6 +47,29 @@ stage_metrics:
     intent_word_count: 8         # 意图性词汇总数
     metaphor_count: 3            # 比喻依赖处数量
     six_layer_coverage: 0.85     # 六层信息覆盖率
+```
+
+### Stage 4.5 Metrics 输出Schema
+
+```yaml
+stage4_5_metrics:
+  stage_id: "stage4_5"
+  stage_name: "资产连续性追踪层"
+  tracked_asset_count:
+    character: 6
+    scene: 3
+    prop: 9
+  continuity_risk_count:
+    high: 2
+    medium: 5
+    low: 8
+  high_risk_asset_jumps:
+    - {asset: "断刀", from: "S01-SH03", to: "S01-SH12"}
+  requires_writer_confirmation_count: 4
+  suggested_visual_anchor_updates:
+    - {asset: "断刀", location: "S01-SH12", reason: "same-location reappearance after battle event"}
+  low_risk_patch_count: 6
+  pass_rate: 0.75
 ```
 
 ---
@@ -88,12 +112,37 @@ prerequisite:
       high: 4
 ```
 
+### Stage 4.5: 资产连续性追踪层
+```yaml
+prerequisite:
+  from_stage2:
+    scene_boundaries:
+      - {id: "S01", start_line: 1, end_line: 45}
+    anchor_count_per_scene:
+      - {scene: "S01", anchors: 4}
+  from_stage3:
+    shot_count: 24
+    scene_shot_map:
+      - {scene: "S01", shots: ["S01-SH01", "S01-SH02"]}
+  from_stage4:
+    key_action_events:
+      - {location: "S01-SH03", actor: "角色A", action: "折断刀并扔到地上", affected_asset: "刀"}
+    interaction_risk_count: 5
+```
+
 ### Stage 5: AI生成适配检查
 ```yaml
 prerequisite:
   from_stage4:
-    action_complexity: 6.2      # 平均动作复杂度(1-10)
-    interaction_risk_count: 5   # 高危交互镜头数
+    action_complexity: 6.2
+    interaction_risk_count: 5
+  from_stage4_5:
+    continuity_risk_count:
+      high: 2
+      medium: 5
+      low: 8
+    suggested_visual_anchor_updates:
+      - {asset: "断刀", location: "S01-SH12", reason: "same-location reappearance after battle event"}
   from_stage3:
     shot_count: 24
 ```
@@ -114,8 +163,12 @@ prerequisite:
     stage2_pass_rate: 0.80
     stage3_pass_rate: 0.65
     stage4_pass_rate: 0.78
+    stage4_5_pass_rate: 0.75
     stage5_pass_rate: 0.60
     stage6_pass_rate: 0.90
+    continuity_risk_high: 2
+    continuity_risk_total: 15
+    requires_writer_confirmation_count: 4
     total_high_findings: 12
     total_findings: 35
     shot_count: 24
