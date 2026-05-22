@@ -52,6 +52,7 @@ script-check-workflow/
     ├── stage2-scene.md
     ├── stage3-shot.md
     ├── stage4-action.md
+    ├── stage4-5-asset-continuity.md
     ├── stage5-ai-adapt.md
     ├── stage6-dialogue.md
     └── stage7-industrial.md
@@ -252,6 +253,7 @@ Use $script-check-workflow to 解释这个技能会输出什么，以及什么�
 - [`references/scoring-criteria.md`](references/scoring-criteria.md)：评分聚合规则
 - [`references/handoff-protocol.md`](references/handoff-protocol.md)：Stage 之间如何通过精简 metrics 传递信息
 - [`references/stage1-principles.md`](references/stage1-principles.md) 到 [`references/stage7-industrial.md`](references/stage7-industrial.md)：7 个阶段的规则正文
+- [`references/stage4-5-asset-continuity.md`](references/stage4-5-asset-continuity.md)：Stage 4.5 资产连续性追踪层规则
 
 ## 适用输入
 
