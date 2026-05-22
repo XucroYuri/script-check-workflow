@@ -1,7 +1,7 @@
 ---
 name: script-check-workflow
 description: |
-  AI可执行剧本的7-stage线性检查与标准化工作流。用于检查、纠正、标准化 AI 视频、动画、分镜执行剧本，并在输入为剧本文本或剧本文件时默认输出两份 Markdown 产物：标准剧本文档与多阶段诊断记录。适用于全量检查、指定 Stage 检查、单镜检查、复查，以及围绕物理降维、跨镜一致性、AI生成风险、台词AI味、工业化验收的剧本质量审查。仅在用户询问规则、评分、阶段说明时进入说明模式，不强制生成文档。
+  AI可执行剧本的7-stage线性检查与标准化工作流。用于检查、纠正、标准化 AI 视频、动画、分镜执行剧本，并在输入为剧本文本或剧本文件时默认输出三份 Markdown 产物：标准剧本文档、多阶段诊断记录与资产连续性账本。适用于全量检查、指定 Stage 检查、单镜检查、复查，以及围绕物理降维、跨镜一致性、AI生成风险、台词AI味、工业化验收的剧本质量审查。仅在用户询问规则、评分、阶段说明时进入说明模式，不强制生成文档。
 ---
 
 # AI可执行剧本检查表V3
@@ -23,7 +23,7 @@ description: |
 先判断用户输入的对象，再决定输出模式：
 
 - 输入是 **剧本文本、剧本文件路径、剧本附件、单场景或单镜原稿**：
-  默认执行检查 + 纠正 + 标准化双产物交付。
+  默认执行检查 + 纠正 + 标准化三产物交付。
 - 输入是 **规则咨询、评分标准解释、Stage说明、工作流说明**：
   进入说明模式，直接回答，不强制生成文档。
 
@@ -72,9 +72,17 @@ description: |
                │ metrics: {action_complexity, interaction_risk_count}
                ▼
 ┌─────────────────────────────────────────────┐
+│ Stage 4.5: 资产连续性追踪层                 │ ← references/stage4-5-asset-continuity.md
+│   角色/场景/道具状态账本 · 推断链 · 编剧确认 │
+│   上游依赖: scene_shot_map, key_action_events│
+└──────────────┬──────────────────────────────┘
+               │ metrics: {continuity_risk_count, suggested_visual_anchor_updates}
+               ▼
+┌─────────────────────────────────────────────┐
 │ Stage 5: AI生成适配检查 (rules 20-27)        │ ← references/stage5-ai-adapt.md
 │   主体控制 · 锚点 · 视觉钉子 · 负向约束 · 风险  │
 │   上游依赖: action_complexity, shot_count     │
+│             continuity_risk_count            │
 └──────────────┬──────────────────────────────┘
                │ metrics: {generation_risk_score, anchor_coverage}
                ▼
@@ -106,7 +114,7 @@ description: |
                ▼
 ┌─────────────────────────────────────────────┐
 │ Stage 10: 产物合成 (orchestrator)            │ ← references/output-artifacts.md
-│   标准剧本 + 诊断记录 + 交付命名               │
+│   标准剧本 + 诊断记录 + 连续性账本 + 交付命名  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -133,7 +141,7 @@ description: |
 读取待检查剧本，先做三件事：
 
 1. 判断模式：
-   - 剧本输入 → 双产物模式
+   - 剧本输入 → 三产物模式
    - 规则咨询 → 说明模式
 2. 判断范围：
    - **全量检查**：完整剧本，执行全部 7 个 Stage
@@ -142,9 +150,11 @@ description: |
    - **复查**：对修改稿重新执行并对比
 3. 判断交付方式：
    - 输入含明确文件路径 → 默认把 `.md` 产物写到源文件同目录
-   - 输入为纯粘贴文本 → 默认在回复中内联输出两个完整 Markdown 文档
+   - 输入为纯粘贴文本 → 默认在回复中内联输出三个完整 Markdown 文档
 
-### Step 1-7: 串行执行 7 个 Stage
+### Step 1-7: 串行执行 7 个主 Stage 与 Stage 4.5
+
+按 Stage 1 → Stage 2 → Stage 3 → Stage 4 → Stage 4.5 → Stage 5 → Stage 6 → Stage 7 的顺序执行。
 
 对每个 Stage：
 
@@ -183,6 +193,17 @@ description: |
 
 最后输出本Stage的 metrics 摘要。
 ```
+
+**Stage 4.5 额外要求：**
+
+Stage 4.5 必须输出 `asset-continuity-ledger` 条目，并把每条推断明确区分为：
+
+1. 已确认剧本事实
+2. 基于中间事件的推断状态
+3. 低风险可补写项
+4. 中/高风险编剧待确认项
+
+不得把高风险人物心理、剧情含义、悬念结构推断直接写入 `standardized-script`。
 
 ### Step 8: 评分聚合
 
@@ -224,15 +245,20 @@ Orchestrator 直接执行，对每个镜头逐一过 12 个问题：
 
 ### Step 10: 产物合成
 
-Stage 1-9 完成后，按 [output-artifacts](references/output-artifacts.md) 合成两份默认产物：
+Stage 1-9 完成后，按 [output-artifacts](references/output-artifacts.md) 合成三份默认产物：
 
 1. **standardized-script**
    - 基于 [template-standard-format](assets/template-standard-format.md) 输出
    - 只保留标准化后的剧本正文
+   - 可吸收 Stage 4.5 的低风险连续性补写
    - 不夹带评分、批注、诊断说明、过程性注释
 2. **diagnostics-record**
    - 吸收旧“结构化检查报告”的全部有效信息
-   - 必须保留运行范围、总分评级、Stage摘要、逐条 findings、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审12问结果、复查建议
+   - 必须保留运行范围、总分评级、Stage摘要、逐条 findings、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审12问结果和复查建议
+3. **asset-continuity-ledger**
+   - 记录角色、场景、道具的连续性状态轨迹
+   - 标明已确认事实、推断状态、风险等级、编剧待确认项和多方案补写建议
+   - 不替代 `standardized-script`，不作为自动改稿结论
 
 如果是 **全量检查**：
 - `standardized-script` 必须是完整标准稿
@@ -252,7 +278,7 @@ Stage 1-9 完成后，按 [output-artifacts](references/output-artifacts.md) 合
 如果用户提供剧本文件路径：
 
 1. 不覆盖源文件
-2. 在源文件同目录写出两个 Markdown 文件
+2. 在源文件同目录写出三个 Markdown 文件
 3. 文件名按 [output-artifacts](references/output-artifacts.md) 的命名规则生成
 4. 回复中报告写入结果和文件路径摘要
 
@@ -261,9 +287,10 @@ Stage 1-9 完成后，按 [output-artifacts](references/output-artifacts.md) 合
 如果用户直接粘贴剧本文本：
 
 1. 不主动落盘
-2. 在回复中内联输出两个完整 Markdown 文档
+2. 在回复中内联输出三个完整 Markdown 文档
 3. 先给 `standardized-script`
 4. 再给 `diagnostics-record`
+5. 最后给 `asset-continuity-ledger`
 
 ---
 
@@ -284,8 +311,8 @@ Orchestrator 必须把每次冲突及裁决依据写入 `diagnostics-record`。
 
 | 命令 | 执行内容 |
 |------|----------|
-| 全量检查 | 7个Stage全部串行执行 + 评分 + 终审12问 + 双产物合成 |
-| 只检查Stage N | 只执行指定Stage，并输出范围限定双产物 |
+| 全量检查 | 7个Stage全部串行执行 + Stage 4.5 + 评分 + 终审12问 + 三产物合成 |
+| 只检查Stage N | 只执行指定Stage，并输出范围限定三产物 |
 | 只做终审 | 跳过Stage 1-7，直接执行终审12问，并只输出诊断结果 |
 | 只做评分 | 基于已有 findings 执行评分聚合，并只输出诊断结果 |
 | 复查 | 对修改后的剧本重新执行全量检查，对比前后差异 |
@@ -301,10 +328,11 @@ Orchestrator 必须把每次冲突及裁决依据写入 `diagnostics-record`。
 | [references/stage2-scene.md](references/stage2-scene.md) | Stage 2 规则 | Stage 2 执行时 |
 | [references/stage3-shot.md](references/stage3-shot.md) | Stage 3 规则 | Stage 3 执行时 |
 | [references/stage4-action.md](references/stage4-action.md) | Stage 4 规则 | Stage 4 执行时 |
+| [references/stage4-5-asset-continuity.md](references/stage4-5-asset-continuity.md) | Stage 4.5 资产连续性追踪规则 | Stage 4.5 执行时 |
 | [references/stage5-ai-adapt.md](references/stage5-ai-adapt.md) | Stage 5 规则 | Stage 5 执行时 |
 | [references/stage6-dialogue.md](references/stage6-dialogue.md) | Stage 6 规则 | Stage 6 执行时 |
 | [references/stage7-industrial.md](references/stage7-industrial.md) | Stage 7 规则 | Stage 7 执行时 |
 | [references/scoring-criteria.md](references/scoring-criteria.md) | 评分权重与标准 | Stage 8 执行时 |
 | [references/handoff-protocol.md](references/handoff-protocol.md) | 层间传递协议 | 每次Stage切换时 |
-| [references/output-artifacts.md](references/output-artifacts.md) | 双产物 schema、命名和交付规则 | Stage 10 执行时 |
+| [references/output-artifacts.md](references/output-artifacts.md) | 三产物 schema、命名和交付规则 | Stage 10 执行时 |
 | [assets/template-standard-format.md](assets/template-standard-format.md) | V3 格式模板 | 标准剧本合成时 |
