@@ -7,17 +7,20 @@
 3. 文件命名
 4. standardized-script 结构
 5. diagnostics-record 结构
-6. 范围限定规则
-7. 交付约束
+6. asset-continuity-ledger 结构
+7. 范围限定规则
+8. 交付约束
 
 ## 产物总览
 
-`AI可执行剧本检查表V3` 的默认产物永远是两份 Markdown 文档：
+`AI可执行剧本检查表V3` 的默认产物是三份 Markdown 文档：
 
 1. `standardized-script`
 2. `diagnostics-record`
+3. `asset-continuity-ledger`
 
 旧的“结构化检查报告”不再单独输出；其有效内容并入 `diagnostics-record`。
+`asset-continuity-ledger` 是面向编剧的资产连续性账本，用于提示角色、场景、道具在剧情推进中的状态继承、状态变化、跳跃式再出现风险和补写建议。
 
 ## 交付模式
 
@@ -27,7 +30,7 @@
 
 1. 读取源文件
 2. 不覆盖源文件
-3. 在源文件同目录写出两个 `.md` 文件
+3. 在源文件同目录写出三个 `.md` 文件
 4. 回复里只做结果摘要，并返回写入路径
 
 ### 纯文本剧本输入
@@ -35,15 +38,16 @@
 如果输入是直接粘贴的剧本文本：
 
 1. 不主动创建文件
-2. 直接内联输出两份完整 Markdown 文档
+2. 直接内联输出三份完整 Markdown 文档
 3. 先输出 `standardized-script`
 4. 再输出 `diagnostics-record`
+5. 最后输出 `asset-continuity-ledger`
 
 ### 说明模式输入
 
 如果输入不是剧本，而是规则、评分、阶段说明：
 
-1. 不生成双文档
+1. 不生成默认产物文档
 2. 按问答方式直接解释
 
 ## 文件命名
@@ -54,11 +58,17 @@
 
 - `<stem>.standardized-script.md`
 - `<stem>.diagnostics.md`
+- `<stem>.asset-continuity-ledger.md`
 
 ### 定向 Stage 检查
 
 - `<stem>.stageN.standardized-script.md`
 - `<stem>.stageN.diagnostics.md`
+- `<stem>.stageN.asset-continuity-ledger.md`
+
+Stage 4.5 定向检查也可使用：
+
+- `<stem>.stage4-5.asset-continuity-ledger.md`
 
 例如：
 
@@ -69,6 +79,7 @@
 
 - `<stem>.shot-<scope>.standardized-script.md`
 - `<stem>.shot-<scope>.diagnostics.md`
+- `<stem>.shot-<scope>.asset-continuity-ledger.md`
 
 `<scope>` 应优先使用稳定的镜头标识，例如：
 
@@ -204,23 +215,70 @@
 
 输出下一轮最值得复查的范围和顺序。
 
+## asset-continuity-ledger 结构
+
+`asset-continuity-ledger` 是面向编剧的资产连续性账本，不是制作资产数据库，也不是自动改稿结论。
+
+### 最小章节
+
+```markdown
+# 资产连续性账本
+
+## 运行范围
+## 总览
+## 高风险连续性缺口
+## 资产状态轨迹
+## 状态变化推断链
+## 编剧待确认项
+## 可进入标准稿的低风险补写
+## 多方案补写建议
+## 下游制作提示
+```
+
+### 条目要求
+
+每条记录至少包含：
+
+- 资产类型：角色 / 场景 / 道具
+- 资产名称
+- 首次出现位置
+- 最后确认状态
+- 中间事件
+- 推断当前状态
+- 置信度
+- 风险等级
+- 风险原因
+- 是否需要编剧确认
+- 低风险补写或多方案建议
+- 下游制作提示
+
+### 写作约束
+
+1. 已确认事实和推断状态必须分开写。
+2. 中高风险项必须标注 `编剧待确认`。
+3. 不把人物心理、剧情含义、悬念结构推断写成事实。
+4. 不把账本内容混入 `standardized-script`。
+
 ## 范围限定规则
 
 ### 全量检查
 
 - `standardized-script` 必须是完整标准稿
 - `diagnostics-record` 覆盖全剧
+- `asset-continuity-ledger` 覆盖全剧关键角色、场景、道具连续性状态
 
 ### 定向 Stage 检查
 
 - `diagnostics-record` 只写该 Stage 结果
 - `standardized-script` 只重写该 Stage 直接影响到的用户指定范围
+- `asset-continuity-ledger` 只覆盖该 Stage 或用户指定范围内可安全判断的连续性问题
 - 文首必须标注“范围限定稿”
 
 ### 单镜检查
 
 - `diagnostics-record` 只覆盖该镜或该片段
 - `standardized-script` 只输出该镜或该片段的标准化版本
+- `asset-continuity-ledger` 只输出该镜或该片段涉及的资产连续性提示，不得补写未检查区域
 - 不得补写未检查区域
 
 ### 只做评分 / 只做终审
