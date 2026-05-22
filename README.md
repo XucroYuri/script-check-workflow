@@ -275,3 +275,8 @@ Use $script-check-workflow to 解释这个技能会输出什么，以及什么�
 - 修改技能主逻辑时，优先更新 [`SKILL.md`](SKILL.md)
 - 变更默认产物契约时，同时更新 [`references/output-artifacts.md`](references/output-artifacts.md)
 - 不要把详细规则重新复制回 `README.md`，避免仓库内出现多份规则源
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=XucroYuri/script-check-workflow&type=Date)](https://star-history.com/#XucroYuri/script-check-workflow&Date)
+
