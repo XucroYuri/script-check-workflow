@@ -155,6 +155,12 @@
 
 diagnostics 必须同时包含 `original_baseline` 和 `candidate_final`，但只有 `candidate_final` 控制交付状态。不得用 `original_baseline` 的通过率、问题数、分数或评级覆盖候选稿结论。
 
+诊断还必须记录：
+
+- 每条计分规则的 `applicable`、`passed`、权重和得分
+- 合同声明的每个硬门槛的逐项布尔结果与失败依据
+- 原稿基线分仅用于比较；最终分类只使用候选稿复审结果
+
 #### 各Stage摘要
 
 按 Stage 汇总：
