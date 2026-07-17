@@ -14,9 +14,9 @@
 
 ## 产物总览
 
-`AI可执行剧本检查表V3` 的默认产物是三份 Markdown 文档：
+`AI可执行剧本检查表V3` 的默认产物是三份 Markdown 文档。剧本文档名称由硬门槛结果决定：
 
-1. `standardized-script`
+1. `standardized-script`（仅 `READY` / `CONDITIONAL`）或 `candidate-script`（`BLOCKED`）
 2. `diagnostics-record`
 3. `asset-continuity-ledger`
 
@@ -40,7 +40,7 @@
 
 1. 不主动创建文件
 2. 直接内联输出三份完整 Markdown 文档
-3. 先输出 `standardized-script`
+3. 先输出与交付状态相符的 `standardized-script` 或 `candidate-script`
 4. 再输出 `diagnostics-record`
 5. 最后输出 `asset-continuity-ledger`
 
@@ -78,6 +78,7 @@
 ## standardized-script 结构
 
 `standardized-script` 是干净终稿，不是 diff，不是批注稿，不是报告。
+只有候选稿通过全部硬门槛并获得 `READY` 或 `CONDITIONAL` 状态后，才可晋升并命名为 `standardized-script`。`BLOCKED` 时必须保留 `candidate-script` 名称，且不得输出任何名为 `standardized-script` 的产物。
 
 ### 必须包含
 
@@ -144,11 +145,15 @@
 - `target_profile`
 - `delivery_status`
 - `hard_gate_results`
-- 总分
-- 评级
+- `original_baseline`：原稿首次审查的 findings、metrics 及可选基线分数，仅用于修改前对照
+- `candidate_final`：最终候选稿完整复审的 findings、metrics、终审结果、硬门槛结果及通过门槛后的分数与评级
+- 总分（仅来自 `candidate_final`）
+- 评级（仅来自 `candidate_final`）
 - 场景数
 - 镜头数
 - 高 / 中 / 低严重性问题数
+
+diagnostics 必须同时包含 `original_baseline` 和 `candidate_final`，但只有 `candidate_final` 控制交付状态。不得用 `original_baseline` 的通过率、问题数、分数或评级覆盖候选稿结论。
 
 #### 各Stage摘要
 

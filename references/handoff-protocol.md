@@ -27,20 +27,44 @@ Reviewer 的响应必须能按本文件的 Finding Schema 和对应 Stage Metric
 
 ## Finding 输出Schema
 
-每个Stage的sub-agent按此格式输出每条发现：
+每个Stage的sub-agent按此稳定格式输出每条发现。`finding_id`、`location_id`、原文行区间与原文哈希共同保证发现可追踪到本轮输入中的确定位置：
 
 ```yaml
 finding:
-  location: "SCENE 001 / 镜头 3 / 第12行"
+  finding_id: "F-stage1-R1.1-S01-SH003-001"
+  stage_id: "stage1"
+  location_id: "S01-SH003"
+  source_span: {start_line: 12, end_line: 12}
+  source_text_sha256: "64 lowercase hex characters"
   rule_id: "R1.1"
-  rule_name: "主观意图降维"
-  severity: "高"          # 高 / 中 / 低
-  description: "画面描述中使用了意图性词汇'试图逃跑'"
-  original: "胶布试图逃跑，朝出口冲去"
-  corrected: "胶布转身面向出口方向，双腿交替快速迈步，上身前倾15度"
-  correction_basis: "规则R1.1要求剔除目的性词汇，将意图降维为几何位移"
-  confidence: 0.9         # 0-1，纠正建议的置信度
+  severity: "high | medium | low"
+  description: "具体问题"
+  original: "原文"
+  corrected: "建议文本"
+  correction_basis: "规则依据"
+  confidence: 0.90
+  writer_decision_needed: false
 ```
+
+## Correction Proposal 输出Schema
+
+每条可执行纠正必须与 finding 分离，并按以下稳定格式输出：
+
+```yaml
+correction_proposal:
+  proposal_id: "P-stage1-R1.1-S01-SH003-001"
+  finding_ids: ["F-stage1-R1.1-S01-SH003-001"]
+  location_id: "S01-SH003"
+  source_span: {start_line: 12, end_line: 12}
+  expected_source_sha256: "64 lowercase hex characters"
+  replacement: "建议文本"
+  affected_assets: ["角色A"]
+  requires_writer_decision: false
+```
+
+Orchestrator 将以下任一情况视为提案冲突：`source_span` 重叠、`location_id` 相同，或 `affected_assets` 相交且提案要求不兼容的资产状态变化。冲突必须先记录并裁决，不能按返回顺序静默覆盖。
+
+应用提案前必须重新计算目标原始片段哈希。实际哈希与 `expected_source_sha256` 不一致时，立即返回 `BLOCKED: STALE_PATCH`；不得猜测新位置、模糊匹配或继续应用其余提案。
 
 ---
 
@@ -196,12 +220,13 @@ Orchestrator在每个Stage完成后：
 1. 保存完整findings列表（用于最终报告）
 2. 提取metrics摘要（用于下游prerequisite注入）
 3. **不向下游传递findings原文**
+4. 单独收集稳定的 `correction_proposal`，仅交给 orchestrator 归并，不注入下游 Stage
 
 ### 冲突检测
-当两个Stage对同一location提出不同correction时：
-1. 记录冲突：`{location, stage_a, correction_a, stage_b, correction_b}`
+当两个Stage对同一位置或资产提出不同 correction 时：
+1. 按重叠 `source_span`、相同 `location_id`、相交 `affected_assets` 的规则检测并记录冲突
 2. 按SKILL.md中的冲突解决优先级规则裁决
 3. 在最终报告中记录冲突及解决依据
 
 ### 报告生成
-汇总全部findings → 按severity排序 → 按scoring-criteria计算得分 → 生成结构化报告
+分别保存 `original_baseline` 与候选稿完整复审产生的 `candidate_final` → 按 severity 排序最终 findings → 执行硬门槛 → 仅在硬门槛通过后按 scoring-criteria 对候选稿计算得分 → 生成结构化报告
