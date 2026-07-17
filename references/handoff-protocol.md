@@ -93,8 +93,8 @@ prerequisite:
   from_stage1:
     scene_count: 3              # 剧本包含多少个场景
     scene_boundaries:           # 场景起止位置
-      - {id: "S01", start: 1, end: 45}
-      - {id: "S02", start: 46, end: 89}
+      - {id: "S01", start_line: 1, end_line: 45}
+      - {id: "S02", start_line: 46, end_line: 89}
 ```
 
 ### Stage 3: 镜头级检查
@@ -102,7 +102,7 @@ prerequisite:
 prerequisite:
   from_stage2:
     scene_boundaries:           # 继承场景边界
-      - {id: "S01", start: 1, end: 45}
+      - {id: "S01", start_line: 1, end_line: 45}
     anchor_count_per_scene:     # 每场景锚点数量
       - {scene: "S01", anchors: 4}
 ```

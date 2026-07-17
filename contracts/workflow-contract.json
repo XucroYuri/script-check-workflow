@@ -20,6 +20,23 @@
     "score_candidate",
     "deliver"
   ],
+  "inputBudget": {
+    "maxScriptUnicodeCodePoints": 60000
+  },
+  "fieldSchemas": {
+    "scene_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "start_line", "end_line"],
+        "properties": {
+          "id": {"type": "string"},
+          "start_line": {"type": "integer", "minimum": 1},
+          "end_line": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  },
   "stages": {
     "stage1": {
       "requires": ["script_text", "run_metadata"],
