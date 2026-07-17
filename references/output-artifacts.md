@@ -4,7 +4,7 @@
 
 1. 产物总览
 2. 交付模式
-3. 文件命名
+3. 文件命名与 no-clobber
 4. standardized-script 结构
 5. diagnostics-record 结构
 6. asset-continuity-ledger 结构
@@ -50,43 +50,23 @@
 1. 不生成默认产物文档
 2. 按问答方式直接解释
 
-## 文件命名
+## 文件命名与 no-clobber
 
-以源文件 stem 为基准命名。
+每次文件模式运行生成 UTC run ID：`YYYYMMDDTHHMMSSZ`。
 
-### 全量检查
+通过全部硬门槛：
 
-- `<stem>.standardized-script.md`
-- `<stem>.diagnostics.md`
-- `<stem>.asset-continuity-ledger.md`
+- `<stem>.<run-id>.standardized-script.md`
+- `<stem>.<run-id>.diagnostics.md`
+- `<stem>.<run-id>.asset-continuity-ledger.md`
 
-### 定向 Stage 检查
+未通过硬门槛：
 
-- `<stem>.stageN.standardized-script.md`
-- `<stem>.stageN.diagnostics.md`
-- `<stem>.stageN.asset-continuity-ledger.md`
+- `<stem>.<run-id>.candidate-script.md`
+- `<stem>.<run-id>.diagnostics.md`
+- `<stem>.<run-id>.asset-continuity-ledger.md`
 
-Stage 4.5 定向检查也可使用：
-
-- `<stem>.stage4-5.asset-continuity-ledger.md`
-
-例如：
-
-- `episode-01.stage5.standardized-script.md`
-- `episode-01.stage5.diagnostics.md`
-
-### 单镜范围检查
-
-- `<stem>.shot-<scope>.standardized-script.md`
-- `<stem>.shot-<scope>.diagnostics.md`
-- `<stem>.shot-<scope>.asset-continuity-ledger.md`
-
-`<scope>` 应优先使用稳定的镜头标识，例如：
-
-- `s01-03`
-- `scene2-shot4`
-
-避免使用空格、中文标点或临时描述词。
+写入策略固定为 `fail-if-exists`。写入前必须同时检查三个目标路径；任一目标已存在时停止并返回 `BLOCKED: OUTPUT_EXISTS`。不得静默覆盖或只写出部分产物。
 
 ## standardized-script 结构
 
@@ -151,6 +131,12 @@ Stage 4.5 定向检查也可使用：
 
 #### 总览
 
+- `run_id`
+- `workflow_version`
+- `input_sha256`
+- `target_profile`
+- `delivery_status`
+- `hard_gate_results`
 - 总分
 - 评级
 - 场景数
