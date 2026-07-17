@@ -6,6 +6,8 @@
 你只负责检查剧本是否达到工业化制作链的标准：格式统一性、团队接力可行性、镜头验收可操作性。
 你不关心文字表述（Stage 1）、场景空间（Stage 2）、镜头构图（Stage 3）、动作细节（Stage 4）、AI适配（Stage 5）或台词内容（Stage 6）。
 
+在 post-synthesis review 中，Stage 7 接收并审查完整 `candidate-script`，不得以原稿替代候选稿。该轮 Stage 1-6 的候选稿 metrics 是 Stage 7 最终验收的唯一上游指标；原稿 metrics 不得作为最终验收证据，只能保留在 diagnostics 的 `original_baseline` 中用于修改前对照。
+
 ## 你的管辖范围
 
 | 规则编号 | 规则名称 | 检查焦点 |
@@ -16,6 +18,8 @@
 | R7.37 | AI验收四问 | 生成后的四项快速验收 |
 
 ## 上游prerequisite
+
+以下字段必须全部来自同一份候选稿的本轮完整复审：
 
 ```yaml
 all_previous_metrics_summary:
@@ -127,20 +131,20 @@ SFX / UI / 屏显
 
 ## Metrics 输出
 
-```yaml
-stage7_metrics:
-  format_consistency: 0.XX        # 格式一致性评分
-  team_handoff_score:             # 岗位与交接评分
-    director: 0.XX
-    storyboard: 0.XX
-    art: 0.XX
-    animation: 0.XX
-    ai_generation: 0.XX
-    continuity_handoff: 0.XX
-  acceptance_readiness: 0.XX      # 验收就绪度
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage7 -->
+```json
+{
+  "team_handoff_score": {
+    "director": 0.9,
+    "storyboard": 0.9,
+    "art": 0.8,
+    "animation": 0.8,
+    "ai_generation": 0.9,
+    "continuity_handoff": 1.0
+  },
+  "acceptance_readiness": 0.9,
+  "stage7_pass_rate": 0.9
+}
 ```
+
+`format_consistency` 是 Stage 3 的规范 metric；Stage 7 消费前序通过率并输出交接与验收指标，不重复声明该字段。Findings 只存在于独立的 `finding` 组件。

@@ -1,10 +1,12 @@
-# AI可执行剧本检查表V3
+# AI可执行剧本检查表V3.2
 
-`AI可执行剧本检查表V3` 是一个面向 AI 可执行剧本的 Agent Skill，用于对 AI 视频、动画、分镜执行剧本做 7-stage 线性检查、纠正与标准化输出。
+`AI可执行剧本检查表V3.2` 是一个面向 AI 可执行剧本的 Agent Skill，用于对 AI 视频、动画、分镜执行剧本做 7-stage 线性检查、纠正与标准化输出。工作流对 Stage 输入输出做契约验证（contract-validated），并在输入、审查、评分或交付证据不完整时失败关闭（fail-closed）。
 
 仓库 slug 与内部 skill ID 仍然保持为 `script-check-workflow`，用于安装路径、兼容目录和 `$script-check-workflow` 触发调用。
 
 它不是文学评论器，也不是故事优劣打分器。它的目标是把剧本翻译成更适合导演、分镜、AI 生成、制作协作与工业化验收的标准化执行文档。
+
+通过本 Skill 不替代具体生成平台、导演或制片流程的最终验收。
 
 ## 这个 Skill 做什么
 
@@ -17,14 +19,23 @@
 
 当输入的是剧本而不是规则咨询时，默认输出三份 Markdown 文档：
 
-1. `standardized-script`
-   基于 [`assets/template-standard-format.md`](assets/template-standard-format.md) 生成的标准剧本文档，不混入评分、批注、诊断说明或过程性注释。
+1. `standardized-script` 或 `candidate-script`
+   获得 `READY` / `CONDITIONAL` 时，基于 [`assets/template-standard-format.md`](assets/template-standard-format.md) 生成 `standardized-script`；`REWORK` / `BLOCKED` 时保留 `candidate-script` 名称。剧本文档不混入评分、批注、诊断说明或过程性注释。
 2. `diagnostics-record`
-   高细粒度诊断记录，至少包含运行范围、总分与评级、各 Stage 摘要、逐条问题、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审 12 问结果和复查建议。
+   高细粒度诊断记录，至少包含运行范围、总分与交付状态、各 Stage 摘要、逐条问题、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审 12 问结果和复查建议。
 3. `asset-continuity-ledger`
    面向编剧的角色、场景、道具连续性状态账本，用于提示隐含状态变化、跳跃式再出现风险、编剧待确认项和多方案补写建议。
 
 命名规则、范围行为与交付约束见 [`references/output-artifacts.md`](references/output-artifacts.md)。
+
+## 交付状态
+
+| 状态 | 含义 |
+|------|------|
+| `READY` | 全部硬门槛通过且候选稿得分至少 90.0，可进入下一制作环节，仍需按项目流程最终验收 |
+| `CONDITIONAL` | 全部硬门槛通过且候选稿得分为 70.0–89.9，允许交付，但必须按 diagnostics 继续优化 |
+| `REWORK` | 全部硬门槛通过但候选稿得分低于 70.0，保留 `candidate-script` 名称，需要重做且不进入生产 |
+| `BLOCKED` | 至少一项硬门槛失败，或契约、安全、写入证据不完整；无论分数多高都不得输出 `standardized-script` |
 
 ## 核心约束
 
@@ -84,6 +95,24 @@ REPO_URL="https://github.com/XucroYuri/script-check-workflow.git"
 
 如果你的远程地址不同，把下面命令中的仓库 URL 替换掉即可。
 
+### 稳定版（可复现）
+
+固定安装 V3.2.0：
+
+```bash
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" script-check-workflow
+```
+
+下面各宿主的安装命令同样固定到 `v3.2.0`。
+
+### 开发版（不可复现）
+
+开发版跟随浮动默认分支，只适合参与开发或提前验证，不能用于可复现安装：
+
+```bash
+git clone "$REPO_URL" script-check-workflow
+```
+
 ### Claude Code
 
 官方 Skills 文档：<https://code.claude.com/docs/en/skills>
@@ -92,14 +121,14 @@ REPO_URL="https://github.com/XucroYuri/script-check-workflow.git"
 
 ```bash
 mkdir -p ~/.claude/skills
-git clone "$REPO_URL" ~/.claude/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" ~/.claude/skills/script-check-workflow
 ```
 
 项目级安装：
 
 ```bash
 mkdir -p .claude/skills
-git clone "$REPO_URL" .claude/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" .claude/skills/script-check-workflow
 ```
 
 说明：
@@ -117,7 +146,7 @@ Codex 官方支持通过 `~/.codex/config.toml` 中的 `skills.config` 注册技
 
 ```bash
 mkdir -p ~/.codex/skills
-git clone "$REPO_URL" ~/.codex/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" ~/.codex/skills/script-check-workflow
 ```
 
 在 `~/.codex/config.toml` 中加入：
@@ -143,14 +172,14 @@ Gemini CLI 官方会自动发现 `.gemini/skills`，也支持把 `.agents/skills
 
 ```bash
 mkdir -p .gemini/skills
-git clone "$REPO_URL" .gemini/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" .gemini/skills/script-check-workflow
 ```
 
 通用兼容安装：
 
 ```bash
 mkdir -p .agents/skills
-git clone "$REPO_URL" .agents/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" .agents/skills/script-check-workflow
 ```
 
 验证：
@@ -179,14 +208,14 @@ OpenCode 原生支持以下目录：
 
 ```bash
 mkdir -p .opencode/skills
-git clone "$REPO_URL" .opencode/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" .opencode/skills/script-check-workflow
 ```
 
 全局原生安装：
 
 ```bash
 mkdir -p ~/.config/opencode/skills
-git clone "$REPO_URL" ~/.config/opencode/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" ~/.config/opencode/skills/script-check-workflow
 ```
 
 如果你已经统一使用 `.agents/skills` 作为跨工具共享目录，也可以直接装在那里。
@@ -205,14 +234,14 @@ OpenClaw 的技能加载位置与优先级为：
 
 ```bash
 mkdir -p skills
-git clone "$REPO_URL" skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" skills/script-check-workflow
 ```
 
 本机共享安装：
 
 ```bash
 mkdir -p ~/.openclaw/skills
-git clone "$REPO_URL" ~/.openclaw/skills/script-check-workflow
+git clone --branch v3.2.0 --depth 1 "$REPO_URL" ~/.openclaw/skills/script-check-workflow
 ```
 
 说明：
@@ -243,7 +272,7 @@ git clone "$REPO_URL" ~/.openclaw/skills/script-check-workflow
 Use $script-check-workflow to 解释这个技能会输出什么，以及什么时候进入说明模式。
 ```
 
-如果工具支持列出技能，也应该能看到内部 ID `script-check-workflow`，或对应的展示名称 `AI可执行剧本检查表V3`。
+如果工具支持列出技能，也应该能看到内部 ID `script-check-workflow`，或对应的展示名称 `AI可执行剧本检查表V3.2`。
 
 ## 仓库内的重要文档
 
@@ -286,9 +315,9 @@ Use $script-check-workflow to 解释这个技能会输出什么，以及什么�
 如果这个项目对你有帮助，可以自愿赞赏支持后续维护。赞赏不是付费咨询服务，也不构成任何结果承诺；请不要在转账备注中填写姓名、手机号、证件号等敏感信息。
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/XucroYuri/lever-gaokao/main/docs/assets/sponsor/alipay-card.png" alt="支付宝赞助二维码" width="260">
+  <img src="https://raw.githubusercontent.com/XucroYuri/lever-gaokao/d012783796ee288ae7c934cf5848ee8ffcd2b773/docs/assets/sponsor/alipay-card.png" alt="支付宝赞助二维码" width="260">
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/XucroYuri/lever-gaokao/main/docs/assets/sponsor/wechat-reward-card.png" alt="微信赞赏二维码" width="260">
+  <img src="https://raw.githubusercontent.com/XucroYuri/lever-gaokao/d012783796ee288ae7c934cf5848ee8ffcd2b773/docs/assets/sponsor/wechat-reward-card.png" alt="微信赞赏二维码" width="260">
 </p>
 
 <p align="center"><strong>时不我待，功不唐捐</strong></p>

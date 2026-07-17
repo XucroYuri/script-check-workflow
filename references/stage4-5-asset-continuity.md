@@ -42,7 +42,7 @@
 后续镜头：同一地点重新出现。
 ```
 
-这把刀不应复位为普通完整道具。它的高概率状态是地面上的断刀，可能沾血、被踩偏、被尸体或碎片遮挡，或者被后续角色移动。
+这把刀不应复位为普通完整道具。原文只确认刀已折断并被扔到地上；是否沾血、发生位移、被遮挡或刀刃朝向如何，均属于需要编剧决定的推断。
 
 ### 3. 只追踪对编剧有价值的连续性信息
 
@@ -68,7 +68,7 @@
 
 - 断裂道具后续仍为断裂状态。
 - 角色伤势、污损、持物关系在连续镜头中延续。
-- 被破坏场景后续仍保留碎片、血迹、烟尘、水火等留痕。
+- 原文已明确确认的碎片、血迹、烟尘、水火等场景留痕在连续镜头中延续。
 
 ### 中风险：进入 asset-continuity-ledger，给多方案建议
 
@@ -109,19 +109,34 @@ from_stage4:
 
 ```yaml
 finding:
-  location: "SCENE 001 / 镜头 12"
+  finding_id: "F-stage4_5-R4.5.1-S01-SH012-001"
+  stage_id: "stage4_5"
+  location_id: "S01-SH012"
+  source_span: {start_line: 84, end_line: 84}
+  source_text_sha256: "4e552328c74ae5e1a6cdf85a1eb0d77ca1ee327e9bbcabfde67a647c407633c2"
   rule_id: "R4.5.1"
-  rule_name: "资产状态跳跃再出现"
-  severity: "高"
-  asset_type: "prop"
-  asset_name: "断刀"
+  severity: "medium"
   description: "断刀在战场事件后重新出现，但剧本未说明其状态是否延续或变化"
   original: "镜头回到地面，角色B跨过刀。"
-  corrected: "地面上的断刀横在血迹旁，刀刃断口朝向门口。角色B从断刀右侧跨过。"
-  correction_basis: "刀已被角色A折断并扔到地上，中间同一位置发生杀戮事件，后续再出现时应保留断裂和环境污染状态"
-  writer_decision_needed: false
+  corrected: "地面上的断刀保持断裂状态。角色B从断刀旁跨过。"
+  correction_basis: "刀已被角色A折断并扔到地上；只延续原文确认的断裂状态，不自动补写污染、位移、遮挡或朝向"
   confidence: 0.85
+  writer_decision_needed: false
+
+correction_proposal:
+  proposal_id: "P-stage4_5-R4.5.1-S01-SH012-001"
+  finding_ids: ["F-stage4_5-R4.5.1-S01-SH012-001"]
+  location_id: "S01-SH012"
+  source_span: {start_line: 84, end_line: 84}
+  expected_source_sha256: "4e552328c74ae5e1a6cdf85a1eb0d77ca1ee327e9bbcabfde67a647c407633c2"
+  replacement: "地面上的断刀保持断裂状态。角色B从断刀旁跨过。"
+  affected_assets: ["断刀"]
+  asset_state_changes:
+    "断刀": {category: "condition", value: "broken"}
+  requires_writer_decision: false
 ```
+
+上述 `writer_decision_needed: false` 只适用于已确认断裂状态的补写。血迹属于推断，不得进入 low_risk_patch。血迹、位移、遮挡和刀刃朝向只能作为 `writer_decision_needed: true` 的备选方案。
 
 ## Ledger 输出Schema
 
@@ -136,43 +151,52 @@ continuity_item:
     - "角色A将刀折断并扔到地上"
     - "同一位置发生战场杀戮"
   inferred_current_state:
-    primary: "断刀仍在地面，高概率沾有血迹或被踩偏"
+    primary: "断刀保持断裂状态"
     alternatives:
-      - "断刀被尸体或碎片部分遮挡"
-      - "断刀被后续角色踢到场景边缘"
+      - description: "断刀沾有血迹"
+        writer_decision_needed: true
+      - description: "断刀被踩偏或移动到场景边缘"
+        writer_decision_needed: true
+      - description: "断刀被尸体或碎片部分遮挡"
+        writer_decision_needed: true
+      - description: "指定刀刃或断口朝向"
+        writer_decision_needed: true
   confidence: "高 | 中 | 低"
   risk_level: "高 | 中 | 低"
   risk_reason: "后续镜头重新回到同一位置，但未说明断刀状态，可能造成视觉连续性断裂"
   writer_decision_needed: true
   recommended_script_patch:
-    low_risk_patch: "地面上的断刀横在血迹旁，刀刃断口朝向门口。"
+    low_risk_patch: "地面上的断刀保持断裂状态。角色B从断刀旁跨过。"
     options:
-      - "保留断刀作为视觉锚点"
-      - "让断刀被尸体遮挡，减少画面重点干扰"
-      - "明确断刀已被角色B捡走，转为后续道具线索"
+      - description: "补写断刀沾有血迹"
+        writer_decision_needed: true
+      - description: "补写断刀发生位移"
+        writer_decision_needed: true
+      - description: "让断刀被尸体或碎片遮挡"
+        writer_decision_needed: true
+      - description: "明确刀刃或断口朝向"
+        writer_decision_needed: true
   downstream_note: "若保留断刀，Stage 5 应将其作为同一场景的视觉锚点或负向约束"
 ```
 
 ## Metrics 输出
 
-```yaml
-stage4_5_metrics:
-  tracked_asset_count:
-    character: N
-    scene: N
-    prop: N
-  continuity_risk_count:
-    high: N
-    medium: N
-    low: N
-  high_risk_asset_jumps:
-    - {asset: "资产名", from: "SCENE/镜头", to: "SCENE/镜头"}
-  requires_writer_confirmation_count: N
-  suggested_visual_anchor_updates:
-    - {asset: "资产名", location: "SCENE/镜头", reason: "为什么应作为锚点或负向约束"}
-  low_risk_patch_count: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage4_5 -->
+```json
+{
+  "tracked_asset_count": {"character": 2, "scene": 1, "prop": 1},
+  "continuity_risk_count": {"high": 0, "medium": 0, "low": 1},
+  "high_risk_asset_jumps": [],
+  "requires_writer_confirmation_count": 0,
+  "suggested_visual_anchor_updates": [
+    {"asset": "门", "location": "S01-SH01", "reason": "保持连续性锚点"}
+  ],
+  "low_risk_patch_count": 1,
+  "stage4_5_pass_rate": 1.0
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。
 
 ## 下游handoff
 
@@ -181,8 +205,6 @@ to_stage5:
   continuity_risk_count: {high: N, medium: N, low: N}
   suggested_visual_anchor_updates: [{asset, location, reason}]
 to_stage7:
-  continuity_risk_high: N
-  continuity_risk_total: N
   requires_writer_confirmation_count: N
 ```
 

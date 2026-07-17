@@ -19,6 +19,44 @@
 | R5.26 | 负向约束 | 是否写了"绝对不要生成什么" |
 | R5.27 | 控制方式建议 | 本镜适合哪种生成方式（可选）|
 
+## 目标生成配置
+
+Orchestrator 必须始终向 Stage 5 提供 `target_profile` 字段。用户未声明目标模型或生成模式时，字段值固定为 JSON `null`，不得使用空对象、`unknown` 字符串或其他占位对象。字段缺失时返回 `BLOCKED: CONTRACT_ERROR`。
+
+`target_profile` 的机器字段 schema 允许 `null` 或满足以下精确七字段 schema 的对象：
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provider",
+    "model",
+    "model_version",
+    "mode",
+    "clip_duration_seconds",
+    "aspect_ratio",
+    "reference_assets_available"
+  ],
+  "properties": {
+    "provider": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "model_version": {"type": "string", "minLength": 1},
+    "mode": {
+      "enum": ["T2V", "I2V", "keyframe-animation", "segmented-generation"]
+    },
+    "clip_duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "aspect_ratio": {"type": "string", "pattern": "^[1-9][0-9]*:[1-9][0-9]*$"},
+    "reference_assets_available": {"type": "boolean"}
+  }
+}
+```
+
+如果用户没有提供目标模型和生成模式，Stage 5 接收 `target_profile: null`，可以输出通用风险建议，但 `target_profile_declared` 必须为 false，最终状态不得是 READY。不得把单一模型经验写成所有模型的永久能力边界。
+
+`target_profile_declared` 是失败关闭硬门槛：`target_profile` 非 null 且通过 schema 验证时为 true，null 或无效时为 false。值为 false 时最终状态必须为 `BLOCKED`，不得进入生产。无效的非 null 对象必须立即返回 `BLOCKED: CONTRACT_ERROR`，不得静默改成 null 或继续作为通用建议运行。
+
 ## 上游prerequisite
 
 ```yaml
@@ -202,24 +240,26 @@ AI不只需要"该生成什么"，也需要"绝对不要生成什么"。（如�
 
 ## Metrics 输出
 
-```yaml
-stage5_metrics:
-  generation_risk_score: N.N      # 整体生成风险评分(1-10)
-  anchor_coverage: 0.XX           # 角色锚点覆盖率
-  visual_nail_count: N            # 视觉钉子数量
-  negative_constraint_coverage: 0.XX  # 负向约束覆盖率
-  high_risk_shots: N              # 高风险镜头数
-  failure_mode_distribution:
-    face_swap: N
-    limb_error: N
-    prop_vanish: N
-    lr_drift: N
-    bg_jump: N
-    action_break: N
-    occlusion: N
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage5 -->
+```json
+{
+  "target_profile_declared": true,
+  "generation_risk_score": 2.0,
+  "anchor_coverage": 1.0,
+  "visual_nail_count": 1,
+  "negative_constraint_coverage": 1.0,
+  "high_risk_shots": 0,
+  "failure_mode_distribution": {
+    "face_swap": 0,
+    "limb_error": 0,
+    "prop_vanish": 0,
+    "lr_drift": 0,
+    "bg_jump": 0,
+    "action_break": 0,
+    "occlusion": 0
+  },
+  "stage5_pass_rate": 1.0
+}
 ```
+
+Findings 必须保留在独立的 `finding` 组件中，不得在 Stage 5 metrics 内另设 findings 计数键。Orchestrator 按 `parse_stage_output(payload, stage_id, prerequisites=None)` 把已验证的 prerequisite 作为第三个参数传入；只有 reviewer 的 `target_profile_declared` 与 parser 从 `target_profile` 推导出的布尔值一致时，该值才可用于硬门槛，reviewer 不得自行断言。

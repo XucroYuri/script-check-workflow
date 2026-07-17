@@ -165,19 +165,17 @@ from_stage2:
 
 ## Metrics 输出
 
-```yaml
-stage3_metrics:
-  shot_count: N                   # 总镜头数
-  avg_info_layers: N.N            # 平均六层信息覆盖数
-  format_consistency: 0.XX        # 镜头格式一致性
-  risk_distribution:
-    low: N
-    medium: N
-    high: N
-  dual_high_conflict_count: N     # 双高冲突镜头数
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage3 -->
+```json
+{
+  "shot_count": 2,
+  "scene_shot_map": [{"scene": "S01", "shots": ["S01-SH01", "S01-SH02"]}],
+  "avg_info_layers": 4.5,
+  "format_consistency": 1.0,
+  "risk_distribution": {"low": 1, "medium": 1, "high": 0},
+  "dual_high_conflict_count": 0,
+  "stage3_pass_rate": 0.9
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。

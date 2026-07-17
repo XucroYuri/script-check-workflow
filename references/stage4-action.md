@@ -184,17 +184,20 @@ from_stage3:
 
 ## Metrics 输出
 
-```yaml
-stage4_metrics:
-  action_complexity: N.N          # 平均动作复杂度(1-10)
-  emotion_leakage_count: N        # 画面层情绪泄漏处数
-  missing_physics_feedback: N     # 缺失物理反馈的碰撞处数
-  action_chain_issues: N          # 动作链不清晰处数
-  overloaded_shots: N             # 动作过密镜头数
-  interaction_risk_count: N       # 高危交互镜头数
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage4 -->
+```json
+{
+  "key_action_events": [
+    {"location": "S01-SH01", "actor": "角色A", "action": "推开", "affected_asset": "门"}
+  ],
+  "action_complexity": 3.0,
+  "emotion_leakage_count": 0,
+  "missing_physics_feedback": 0,
+  "action_chain_issues": 0,
+  "overloaded_shots": 0,
+  "interaction_risk_count": 0,
+  "stage4_pass_rate": 1.0
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。

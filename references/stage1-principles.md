@@ -184,19 +184,18 @@ AI不理解情绪词和主观意图，AI更擅长理解"情绪的物理外显"�
 
 完成检查后，输出以下metrics供下游Stage使用：
 
-```yaml
-stage1_metrics:
-  scene_count: N              # 剧本总场景数
-  scene_boundaries:           # 各场景起止位置
-    - {id: "S01", start_line: N, end_line: N}
-  character_count: N          # 出场角色数
-  pronoun_density: 0.XX       # 画面层代词占总词数比
-  intent_word_count: N        # 意图性词汇出现总次数
-  metaphor_count: N           # 比喻依赖处数量
-  six_layer_coverage: 0.XX    # 六层信息平均覆盖率
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage1 -->
+```json
+{
+  "scene_count": 1,
+  "scene_boundaries": [{"id": "S01", "start_line": 1, "end_line": 3}],
+  "character_count": 2,
+  "pronoun_density": 0.1,
+  "intent_word_count": 0,
+  "metaphor_count": 0,
+  "six_layer_coverage": 0.8,
+  "stage1_pass_rate": 0.9
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。

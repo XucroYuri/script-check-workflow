@@ -4,18 +4,19 @@
 
 1. 产物总览
 2. 交付模式
-3. 文件命名
+3. 文件命名与 no-clobber
 4. standardized-script 结构
 5. diagnostics-record 结构
 6. asset-continuity-ledger 结构
 7. 范围限定规则
 8. 交付约束
+9. 安全发布事务
 
 ## 产物总览
 
-`AI可执行剧本检查表V3` 的默认产物是三份 Markdown 文档：
+`AI可执行剧本检查表V3.2` 的默认产物是三份 Markdown 文档。剧本文档名称由交付状态决定：
 
-1. `standardized-script`
+1. `standardized-script`（仅 `READY` / `CONDITIONAL`）或 `candidate-script`（`REWORK` / `BLOCKED`）
 2. `diagnostics-record`
 3. `asset-continuity-ledger`
 
@@ -39,7 +40,7 @@
 
 1. 不主动创建文件
 2. 直接内联输出三份完整 Markdown 文档
-3. 先输出 `standardized-script`
+3. 先输出与交付状态相符的 `standardized-script` 或 `candidate-script`
 4. 再输出 `diagnostics-record`
 5. 最后输出 `asset-continuity-ledger`
 
@@ -50,47 +51,34 @@
 1. 不生成默认产物文档
 2. 按问答方式直接解释
 
-## 文件命名
+## 文件命名与 no-clobber
 
-以源文件 stem 为基准命名。
+每次文件模式运行生成 UTC run ID：`YYYYMMDDTHHMMSSZ`。
 
-### 全量检查
+交付状态为 `READY` 或 `CONDITIONAL`：
 
-- `<stem>.standardized-script.md`
-- `<stem>.diagnostics.md`
-- `<stem>.asset-continuity-ledger.md`
+- `<stem>.<run-id>.standardized-script.md`
+- `<stem>.<run-id>.diagnostics.md`
+- `<stem>.<run-id>.asset-continuity-ledger.md`
 
-### 定向 Stage 检查
+交付状态为 `REWORK` 或 `BLOCKED`：
 
-- `<stem>.stageN.standardized-script.md`
-- `<stem>.stageN.diagnostics.md`
-- `<stem>.stageN.asset-continuity-ledger.md`
+- `<stem>.<run-id>.candidate-script.md`
+- `<stem>.<run-id>.diagnostics.md`
+- `<stem>.<run-id>.asset-continuity-ledger.md`
 
-Stage 4.5 定向检查也可使用：
+写入策略固定为 `fail-if-exists`。写入前必须同时检查三个目标路径；任一目标已存在时停止并返回 `BLOCKED: OUTPUT_EXISTS`。不得静默覆盖或只写出部分产物。
 
-- `<stem>.stage4-5.asset-continuity-ledger.md`
+## 安全发布事务
 
-例如：
+完整安全规则以 [security-model.md](security-model.md) 为准。发布前必须对三个最终目标做同一次预检，写入并验证三个同目录临时文件。三个重命名操作不是一个原子事务：`READY` / `CONDITIONAL` 时按“diagnostics → asset-continuity-ledger → standardized-script 最后”的顺序发布；`REWORK` / `BLOCKED` 时按“diagnostics → asset-continuity-ledger → candidate-script 最后”的顺序发布。
 
-- `episode-01.stage5.standardized-script.md`
-- `episode-01.stage5.diagnostics.md`
-
-### 单镜范围检查
-
-- `<stem>.shot-<scope>.standardized-script.md`
-- `<stem>.shot-<scope>.diagnostics.md`
-- `<stem>.shot-<scope>.asset-continuity-ledger.md`
-
-`<scope>` 应优先使用稳定的镜头标识，例如：
-
-- `s01-03`
-- `scene2-shot4`
-
-避免使用空格、中文标点或临时描述词。
+任一 rename/no-replace 失败时，删除本次已发布的文件和全部临时文件，并返回 `BLOCKED: OUTPUT_COMMIT_FAILED`；不得覆盖既有文件，也不得留下看似完整的标准稿或候选稿。
 
 ## standardized-script 结构
 
 `standardized-script` 是干净终稿，不是 diff，不是批注稿，不是报告。
+只有候选稿获得 `READY` 或 `CONDITIONAL` 状态后，才可晋升并命名为 `standardized-script`。`REWORK` 或 `BLOCKED` 时必须保留 `candidate-script` 名称，且不得输出任何名为 `standardized-script` 的产物。
 
 ### 必须包含
 
@@ -151,11 +139,27 @@ Stage 4.5 定向检查也可使用：
 
 #### 总览
 
-- 总分
-- 评级
+- `run_id`
+- `workflow_version`
+- `input_sha256`
+- `target_profile`
+- `delivery_status`
+- `hard_gate_results`
+- `original_baseline`：原稿首次审查的 findings、metrics 及可选基线分数，仅用于修改前对照
+- `candidate_final`：最终候选稿完整复审的 findings、metrics、终审结果、硬门槛结果、分数及交付状态
+- 总分（仅来自 `candidate_final`）
+- 交付状态（仅来自 `candidate_final`，为 `READY`、`CONDITIONAL`、`REWORK` 或 `BLOCKED`）
 - 场景数
 - 镜头数
 - 高 / 中 / 低严重性问题数
+
+diagnostics 必须同时包含 `original_baseline` 和 `candidate_final`，但只有 `candidate_final` 控制交付状态。不得用 `original_baseline` 的通过率、问题数、分数或交付状态覆盖候选稿结论。
+
+诊断还必须记录：
+
+- 每条计分规则的 `applicable`、`passed`、权重和得分
+- 合同声明的每个硬门槛的逐项布尔结果与失败依据
+- 原稿基线分仅用于比较；最终分类只使用候选稿复审结果
 
 #### 各Stage摘要
 
@@ -263,21 +267,22 @@ Stage 4.5 定向检查也可使用：
 
 ### 全量检查
 
-- `standardized-script` 必须是完整标准稿
+- `READY` / `CONDITIONAL` 的 `standardized-script` 必须是完整标准稿
+- `REWORK` / `BLOCKED` 的剧本文档必须保持 `candidate-script` 名称
 - `diagnostics-record` 覆盖全剧
 - `asset-continuity-ledger` 覆盖全剧关键角色、场景、道具连续性状态
 
 ### 定向 Stage 检查
 
 - `diagnostics-record` 只写该 Stage 结果
-- `standardized-script` 只重写该 Stage 直接影响到的用户指定范围
+- 剧本文档只重写该 Stage 直接影响到的用户指定范围，并按交付状态命名为 `standardized-script` 或 `candidate-script`
 - `asset-continuity-ledger` 只覆盖该 Stage 或用户指定范围内可安全判断的连续性问题
 - 文首必须标注“范围限定稿”
 
 ### 单镜检查
 
 - `diagnostics-record` 只覆盖该镜或该片段
-- `standardized-script` 只输出该镜或该片段的标准化版本
+- 剧本文档只输出该镜或该片段的标准化版本，并按交付状态命名为 `standardized-script` 或 `candidate-script`
 - `asset-continuity-ledger` 只输出该镜或该片段涉及的资产连续性提示，不得补写未检查区域
 - 不得补写未检查区域
 
