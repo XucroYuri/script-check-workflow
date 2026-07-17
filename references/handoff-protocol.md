@@ -146,7 +146,7 @@ stage5_metrics:
   stage5_pass_rate: 0.92
 ```
 
-`target_profile_declared` 必须是布尔值。其值仅在 `target_profile` 非 null 且通过 schema 验证时为 true；null 或无效时为 false。无效的非 null 输入同时触发 `BLOCKED: CONTRACT_ERROR`，因此不得进入 Stage reviewer 或被静默当作 null。Orchestrator 必须把已验证的 prerequisite 传给 `parse_stage_output`，并只使用 parser 与推导值匹配后的 `target_profile_declared` 作为硬门槛；reviewer 不能自行断言该门槛。
+`target_profile_declared` 必须是布尔值。其值仅在 `target_profile` 非 null 且通过 schema 验证时为 true；null 或无效时为 false。无效的非 null 输入同时触发 `BLOCKED: CONTRACT_ERROR`，因此不得进入 Stage reviewer 或被静默当作 null。Orchestrator 必须按 `parse_stage_output(payload, stage_id, prerequisites=None)` 把已验证的 prerequisite 作为第三个参数传入，并只使用 parser 与推导值匹配后的 `target_profile_declared` 作为硬门槛；reviewer 不能自行断言该门槛。
 
 ---
 

@@ -374,8 +374,8 @@ def _valid_proposal(record: Any, finding_ids: Iterable[str]) -> bool:
 
 
 def parse_stage_output(
-    stage_id: str,
     payload: Any,
+    stage_id: str,
     prerequisites: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Validate the three reviewer output components or fail closed."""
