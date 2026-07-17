@@ -256,9 +256,7 @@ stage5_metrics:
     bg_jump: N
     action_break: N
     occlusion: N
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+  stage5_pass_rate: 0.XX
 ```
+
+Findings 必须保留在独立的 `finding` 组件中，不得作为 `metrics.findings_count` 混入 Stage 5 metrics。Orchestrator 把已验证的 prerequisite 传入 `parse_stage_output`；只有 reviewer 的 `target_profile_declared` 与 parser 从 `target_profile` 推导出的布尔值一致时，该值才可用于硬门槛，reviewer 不得自行断言。

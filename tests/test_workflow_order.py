@@ -86,6 +86,42 @@ def valid_target_profile(**overrides):
     return profile
 
 
+def stage5_payload(target_profile_declared):
+    stage5_finding = finding(
+        finding_id="F-stage5-R5.20-S01-SH001-001",
+        stage_id="stage5",
+        rule_id="R5.20",
+    )
+    stage5_proposal = proposal(
+        proposal_id="P-stage5-R5.20-S01-SH001-001",
+        finding_id="F-stage5-R5.20-S01-SH001-001",
+    )
+    return {
+        "finding": [stage5_finding],
+        "correction_proposal": [stage5_proposal],
+        "metrics": {
+            "target_profile_declared": target_profile_declared,
+            "generation_risk_score": 2.0,
+            "anchor_coverage": 1.0,
+            "visual_nail_count": 1,
+            "negative_constraint_coverage": 1.0,
+            "high_risk_shots": 0,
+            "failure_mode_distribution": {},
+            "stage5_pass_rate": 1.0,
+        },
+    }
+
+
+def documented_stage5_metric_fields(relative_path):
+    text = (ROOT / relative_path).read_text(encoding="utf-8")
+    block = text.split("stage5_metrics:", 1)[1].split("```", 1)[0]
+    return {
+        line.strip().split(":", 1)[0]
+        for line in block.splitlines()
+        if line.startswith("  ") and not line.startswith("    ")
+    }
+
+
 class WorkflowOrderTests(unittest.TestCase):
     def setUp(self):
         self.contract = load_contract(ROOT / "contracts/workflow-contract.json")
@@ -297,7 +333,11 @@ class WorkflowOrderTests(unittest.TestCase):
         }
         payload = {"finding": [], "correction_proposal": [], "metrics": metrics}
         try:
-            parsed = policy.parse_stage_output(payload, "stage5")
+            parsed = policy.parse_stage_output(
+                "stage5",
+                payload,
+                prerequisites={"target_profile": valid_target_profile()},
+            )
         except policy.WorkflowBlocked as exc:
             self.fail("canonical Stage 5 metrics must parse: {}".format(exc))
         self.assertEqual(payload, parsed)
@@ -312,13 +352,93 @@ class WorkflowOrderTests(unittest.TestCase):
                     policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
                 ):
                     policy.parse_stage_output(
+                        "stage5",
                         {
                             "finding": [],
                             "correction_proposal": [],
                             "metrics": invalid_metrics,
                         },
-                        "stage5",
+                        prerequisites={"target_profile": valid_target_profile()},
                     )
+
+    def test_documented_stage5_metrics_parse_with_findings_and_proposals(self):
+        payload = stage5_payload(True)
+        metric_fields = set(payload["metrics"])
+        self.assertEqual(
+            metric_fields,
+            documented_stage5_metric_fields("references/handoff-protocol.md"),
+        )
+        self.assertEqual(
+            metric_fields,
+            documented_stage5_metric_fields("references/stage5-ai-adapt.md"),
+        )
+        try:
+            parsed = policy.parse_stage_output(
+                "stage5", payload, prerequisites={"target_profile": valid_target_profile()}
+            )
+        except Exception as exc:
+            self.fail("documented Stage 5 payload must parse: {}".format(exc))
+        self.assertEqual(payload, parsed)
+
+    def test_stage5_parser_derives_declaration_from_prerequisites(self):
+        for profile, declared in ((None, False), (valid_target_profile(), True)):
+            with self.subTest(profile=profile):
+                payload = stage5_payload(declared)
+                try:
+                    parsed = policy.parse_stage_output(
+                        "stage5", payload, prerequisites={"target_profile": profile}
+                    )
+                except Exception as exc:
+                    self.fail("canonical Stage 5 prerequisite must parse: {}".format(exc))
+                self.assertEqual(declared, parsed["metrics"]["target_profile_declared"])
+
+    def test_stage5_parser_requires_target_profile_prerequisite(self):
+        for prerequisites in (None, {}):
+            with self.subTest(prerequisites=prerequisites):
+                try:
+                    policy.parse_stage_output(
+                        "stage5", stage5_payload(False), prerequisites=prerequisites
+                    )
+                except policy.WorkflowBlocked as exc:
+                    self.assertRegex(str(exc), "BLOCKED: CONTRACT_ERROR")
+                except Exception as exc:
+                    self.fail("missing prerequisite must fail closed: {}".format(exc))
+                else:
+                    self.fail("missing target_profile prerequisite was accepted")
+
+    def test_stage5_parser_rejects_reviewer_declaration_mismatch(self):
+        mismatches = (
+            (None, True),
+            (valid_target_profile(), False),
+        )
+        for profile, declared in mismatches:
+            with self.subTest(profile=profile, declared=declared):
+                try:
+                    policy.parse_stage_output(
+                        "stage5",
+                        stage5_payload(declared),
+                        prerequisites={"target_profile": profile},
+                    )
+                except policy.WorkflowBlocked as exc:
+                    self.assertRegex(str(exc), "BLOCKED: INVALID_STAGE_OUTPUT")
+                except Exception as exc:
+                    self.fail("declaration mismatch must fail closed: {}".format(exc))
+                else:
+                    self.fail("reviewer declaration mismatch was accepted")
+
+    def test_stage5_parser_rejects_invalid_non_null_profile_as_contract_error(self):
+        try:
+            policy.parse_stage_output(
+                "stage5",
+                stage5_payload(False),
+                prerequisites={"target_profile": valid_target_profile(mode="invalid")},
+            )
+        except policy.WorkflowBlocked as exc:
+            self.assertRegex(str(exc), "BLOCKED: CONTRACT_ERROR")
+        except Exception as exc:
+            self.fail("invalid target profile must fail closed: {}".format(exc))
+        else:
+            self.fail("invalid non-null target profile was accepted")
 
     def test_inferred_continuity_states_require_writer_decision(self):
         for state in ("blood", "displacement", "occlusion", "orientation"):
@@ -376,7 +496,7 @@ class WorkflowOrderTests(unittest.TestCase):
                 "stage7_pass_rate": 0.9,
             },
         }
-        self.assertEqual(payload, policy.parse_stage_output(payload, "stage7"))
+        self.assertEqual(payload, policy.parse_stage_output("stage7", payload))
         for component in ("finding", "correction_proposal", "metrics"):
             with self.subTest(component=component):
                 invalid = dict(payload)
@@ -384,28 +504,28 @@ class WorkflowOrderTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
                 ):
-                    policy.parse_stage_output(invalid, "stage7")
+                    policy.parse_stage_output("stage7", invalid)
 
         invalid_finding = dict(payload)
         invalid_finding["finding"] = [finding(severity="critical")]
         with self.assertRaisesRegex(
             policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
         ):
-            policy.parse_stage_output(invalid_finding, "stage7")
+            policy.parse_stage_output("stage7", invalid_finding)
 
         invalid_proposal = deepcopy(payload)
         invalid_proposal["correction_proposal"][0]["proposal_id"] = "P-wrong"
         with self.assertRaisesRegex(
             policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
         ):
-            policy.parse_stage_output(invalid_proposal, "stage7")
+            policy.parse_stage_output("stage7", invalid_proposal)
 
         invalid_metrics = deepcopy(payload)
         del invalid_metrics["metrics"]["stage7_pass_rate"]
         with self.assertRaisesRegex(
             policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
         ):
-            policy.parse_stage_output(invalid_metrics, "stage7")
+            policy.parse_stage_output("stage7", invalid_metrics)
 
         false_flagged_blood = deepcopy(payload)
         false_flagged_blood["correction_proposal"][0]["asset_state_changes"] = {
@@ -416,7 +536,7 @@ class WorkflowOrderTests(unittest.TestCase):
         ] = False
         self.assertEqual(
             false_flagged_blood,
-            policy.parse_stage_output(false_flagged_blood, "stage7"),
+            policy.parse_stage_output("stage7", false_flagged_blood),
         )
 
     def test_parse_then_apply_preserves_snapshot_error_precedence(self):
@@ -438,7 +558,7 @@ class WorkflowOrderTests(unittest.TestCase):
                 "stage7_pass_rate": 0.9,
             },
         }
-        parsed_stale = policy.parse_stage_output(stale_payload, "stage7")
+        parsed_stale = policy.parse_stage_output("stage7", stale_payload)
         with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
             policy.apply_correction_proposals(
                 script, parsed_stale["correction_proposal"]
@@ -448,7 +568,7 @@ class WorkflowOrderTests(unittest.TestCase):
         valid_payload["correction_proposal"][0][
             "expected_source_sha256"
         ] = policy.source_fragment_sha256(script, 1, 1)
-        parsed_valid = policy.parse_stage_output(valid_payload, "stage7")
+        parsed_valid = policy.parse_stage_output("stage7", valid_payload)
         with self.assertRaisesRegex(
             policy.WorkflowBlocked, "BLOCKED: WRITER_DECISION_REQUIRED"
         ):

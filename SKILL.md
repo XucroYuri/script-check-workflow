@@ -288,6 +288,8 @@ Orchestrator 对候选稿中的每个镜头逐一执行终审 12 问：
 
 `target_profile_declared` 的推导规则固定为：`target_profile` 非 null 且通过 schema 验证时为 true；null 或无效时为 false。null 可进入 Stage 5 获取通用风险建议，但硬门槛失败；无效的非 null 值还必须先以 `BLOCKED: CONTRACT_ERROR` 失败关闭，不能伪装成未声明。
 
+Orchestrator 必须调用 `parse_stage_output(stage_id, payload, prerequisites)` 并把已验证的 Stage 5 prerequisite 传入 parser。Parser 必须比较 reviewer 输出的 `target_profile_declared` 与从 `target_profile` 推导的值；不一致时返回 `BLOCKED: INVALID_STAGE_OUTPUT`。只有匹配后的推导值可用于硬门槛，reviewer 不能自行断言该门槛。
+
 ### Step 12: 交付
 
 - `READY` 或 `CONDITIONAL`：候选稿晋升为 `standardized-script`。
@@ -366,4 +368,4 @@ Orchestrator 必须把每次冲突及裁决依据写入 `diagnostics-record`。
 | [references/handoff-protocol.md](references/handoff-protocol.md) | 层间传递协议 | 每次Stage切换时 |
 | [references/security-model.md](references/security-model.md) | 信任边界、输入验证与安全交付 | 接收剧本和执行 Stage 前 |
 | [references/output-artifacts.md](references/output-artifacts.md) | 三产物 schema、命名和交付规则 | Step 12 执行时 |
-| [assets/template-standard-format.md](assets/template-standard-format.md) | V3 格式模板 | 标准剧本合成时 |
+| [assets/template-standard-format.md](assets/template-standard-format.md) | V3.2 格式模板 | 标准剧本合成时 |

@@ -3,7 +3,7 @@
 from copy import deepcopy
 from hashlib import sha256
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from scripts.contract import (
     CORRECTION_POLICY,
@@ -14,6 +14,7 @@ from scripts.contract import (
 
 
 INVALID_STAGE_OUTPUT = "BLOCKED: INVALID_STAGE_OUTPUT"
+CONTRACT_ERROR = "BLOCKED: CONTRACT_ERROR"
 MAX_AUTOMATIC_CORRECTION_CYCLES = CORRECTION_POLICY[
     "maxAutomaticCorrectionCycles"
 ]
@@ -117,7 +118,7 @@ def validate_target_profile_input(target_profile: Any) -> bool:
         return False
     declared = target_profile_declared_gate(target_profile)
     if not declared:
-        raise WorkflowBlocked("BLOCKED: CONTRACT_ERROR")
+        raise WorkflowBlocked(CONTRACT_ERROR)
     return True
 
 
@@ -372,8 +373,20 @@ def _valid_proposal(record: Any, finding_ids: Iterable[str]) -> bool:
     )
 
 
-def parse_stage_output(payload: Any, stage_id: str) -> Dict[str, Any]:
+def parse_stage_output(
+    stage_id: str,
+    payload: Any,
+    prerequisites: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
     """Validate the three reviewer output components or fail closed."""
+
+    derived_target_profile_declared = None
+    if stage_id == "stage5":
+        if not isinstance(prerequisites, Mapping) or "target_profile" not in prerequisites:
+            raise WorkflowBlocked(CONTRACT_ERROR)
+        derived_target_profile_declared = validate_target_profile_input(
+            prerequisites["target_profile"]
+        )
 
     try:
         if not isinstance(payload, dict) or set(payload) != OUTPUT_COMPONENTS:
@@ -413,6 +426,12 @@ def parse_stage_output(payload: Any, stage_id: str) -> Dict[str, Any]:
             raise ValueError
         if stage_id == "stage5" and not isinstance(
             metrics.get("target_profile_declared"), bool
+        ):
+            raise ValueError
+        if (
+            stage_id == "stage5"
+            and metrics["target_profile_declared"]
+            is not derived_target_profile_declared
         ):
             raise ValueError
     except (KeyError, TypeError, ValueError):
