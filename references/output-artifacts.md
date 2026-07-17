@@ -10,6 +10,7 @@
 6. asset-continuity-ledger 结构
 7. 范围限定规则
 8. 交付约束
+9. 安全发布事务
 
 ## 产物总览
 
@@ -67,6 +68,12 @@
 - `<stem>.<run-id>.asset-continuity-ledger.md`
 
 写入策略固定为 `fail-if-exists`。写入前必须同时检查三个目标路径；任一目标已存在时停止并返回 `BLOCKED: OUTPUT_EXISTS`。不得静默覆盖或只写出部分产物。
+
+## 安全发布事务
+
+完整安全规则以 [security-model.md](security-model.md) 为准。发布前必须对三个最终目标做同一次预检，写入并验证三个同目录临时文件。三个重命名操作不是一个原子事务：通过硬门槛时按“diagnostics → asset-continuity-ledger → standardized-script 最后”的顺序发布；候选交付时按“diagnostics → asset-continuity-ledger → candidate-script 最后”的顺序发布。
+
+任一 rename/no-replace 失败时，删除本次已发布的文件和全部临时文件，并返回 `BLOCKED: OUTPUT_COMMIT_FAILED`；不得覆盖既有文件，也不得留下看似完整的标准稿或候选稿。
 
 ## standardized-script 结构
 
