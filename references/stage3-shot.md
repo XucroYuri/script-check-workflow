@@ -168,6 +168,7 @@ from_stage2:
 ```yaml
 stage3_metrics:
   shot_count: N                   # 总镜头数
+  scene_shot_map: [{scene, shots}]
   avg_info_layers: N.N            # 平均六层信息覆盖数
   format_consistency: 0.XX        # 镜头格式一致性
   risk_distribution:

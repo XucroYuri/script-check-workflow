@@ -134,6 +134,7 @@ from_stage1:
 
 ```yaml
 stage2_metrics:
+  scene_boundaries: [{id, start_line, end_line}]
   anchor_count_per_scene:
     - {scene: "S01", anchors: N, names: ["锚点A", "锚点B", ...]}
   initial_state_completeness: 0.XX  # 场景初始状态完整度

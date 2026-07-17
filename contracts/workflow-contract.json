@@ -1,0 +1,210 @@
+{
+  "contractVersion": "3.2.0",
+  "stageOrder": [
+    "stage1",
+    "stage2",
+    "stage3",
+    "stage4",
+    "stage4_5",
+    "stage5",
+    "stage6",
+    "stage7"
+  ],
+  "workflowPhases": [
+    "ingest_untrusted_input",
+    "analyze_original",
+    "resolve_corrections",
+    "synthesize_candidate",
+    "review_candidate",
+    "evaluate_hard_gates",
+    "score_candidate",
+    "deliver"
+  ],
+  "stages": {
+    "stage1": {
+      "requires": ["script_text", "run_metadata"],
+      "produces": [
+        "scene_count",
+        "scene_boundaries",
+        "character_count",
+        "pronoun_density",
+        "intent_word_count",
+        "metaphor_count",
+        "six_layer_coverage",
+        "stage1_findings",
+        "stage1_pass_rate"
+      ]
+    },
+    "stage2": {
+      "requires": ["script_text", "scene_count", "scene_boundaries"],
+      "produces": [
+        "scene_boundaries",
+        "anchor_count_per_scene",
+        "initial_state_completeness",
+        "consistency_score",
+        "atmosphere_specificity",
+        "stage2_findings",
+        "stage2_pass_rate"
+      ]
+    },
+    "stage3": {
+      "requires": ["script_text", "scene_boundaries", "anchor_count_per_scene"],
+      "produces": [
+        "shot_count",
+        "scene_shot_map",
+        "avg_info_layers",
+        "format_consistency",
+        "risk_distribution",
+        "dual_high_conflict_count",
+        "stage3_findings",
+        "stage3_pass_rate"
+      ]
+    },
+    "stage4": {
+      "requires": ["script_text", "shot_count", "risk_distribution"],
+      "produces": [
+        "key_action_events",
+        "action_complexity",
+        "emotion_leakage_count",
+        "missing_physics_feedback",
+        "action_chain_issues",
+        "overloaded_shots",
+        "interaction_risk_count",
+        "stage4_findings",
+        "stage4_pass_rate"
+      ]
+    },
+    "stage4_5": {
+      "requires": [
+        "script_text",
+        "scene_boundaries",
+        "anchor_count_per_scene",
+        "shot_count",
+        "scene_shot_map",
+        "key_action_events",
+        "interaction_risk_count"
+      ],
+      "produces": [
+        "tracked_asset_count",
+        "continuity_risk_count",
+        "high_risk_asset_jumps",
+        "requires_writer_confirmation_count",
+        "suggested_visual_anchor_updates",
+        "low_risk_patch_count",
+        "stage4_5_findings",
+        "stage4_5_pass_rate"
+      ]
+    },
+    "stage5": {
+      "requires": [
+        "script_text",
+        "target_profile",
+        "action_complexity",
+        "interaction_risk_count",
+        "continuity_risk_count",
+        "suggested_visual_anchor_updates",
+        "shot_count"
+      ],
+      "produces": [
+        "generation_risk_score",
+        "anchor_coverage",
+        "visual_nail_count",
+        "negative_constraint_coverage",
+        "high_risk_shots",
+        "failure_mode_distribution",
+        "stage5_findings",
+        "stage5_pass_rate"
+      ]
+    },
+    "stage6": {
+      "requires": ["script_text", "character_count", "scene_count"],
+      "produces": [
+        "isolation_compliance",
+        "ai_taste_score",
+        "dialogue_mismatch_count",
+        "natural_speech_score",
+        "stage6_findings",
+        "stage6_pass_rate"
+      ]
+    },
+    "stage7": {
+      "requires": [
+        "script_text",
+        "scene_count",
+        "shot_count",
+        "requires_writer_confirmation_count",
+        "stage1_pass_rate",
+        "stage2_pass_rate",
+        "stage3_pass_rate",
+        "stage4_pass_rate",
+        "stage4_5_pass_rate",
+        "stage5_pass_rate",
+        "stage6_pass_rate"
+      ],
+      "produces": [
+        "team_handoff_score",
+        "acceptance_readiness",
+        "stage7_findings",
+        "stage7_pass_rate"
+      ]
+    }
+  },
+  "scoring": {
+    "ruleWeights": {
+      "R1.1": 7.0,
+      "R1.2": 7.0,
+      "R1.3": 5.0,
+      "R1.4": 6.0,
+      "R2.5": 4.0,
+      "R2.6": 4.0,
+      "R2.7": 4.0,
+      "R2.8": 3.0,
+      "R3.9": 5.0,
+      "R3.10": 4.0,
+      "R3.11": 3.0,
+      "R3.12": 3.0,
+      "R3.13": 3.0,
+      "R3.14": 2.0,
+      "R4.15": 4.0,
+      "R4.16": 4.0,
+      "R4.16.5": 3.0,
+      "R4.17": 2.0,
+      "R4.18": 1.0,
+      "R4.19": 1.0,
+      "R5.20": 3.0,
+      "R5.21": 3.0,
+      "R5.22": 3.0,
+      "R5.23": 2.0,
+      "R5.24": 2.0,
+      "R5.25": 1.0,
+      "R5.26": 1.0,
+      "R6.28": 2.0,
+      "R6.29": 1.0,
+      "R6.30": 1.0,
+      "R6.31": 1.0,
+      "R7.34": 2.0,
+      "R7.35": 2.0,
+      "R7.36": 0.5,
+      "R7.37": 0.5
+    },
+    "nonScoringRules": [
+      "R4.5.1",
+      "R4.5.2",
+      "R4.5.3",
+      "R4.5.4",
+      "R5.27",
+      "R6.32",
+      "R6.33"
+    ],
+    "hardGates": [
+      "contract_valid",
+      "post_synthesis_review_complete",
+      "unresolved_high_findings_zero",
+      "unresolved_high_writer_confirmations_zero",
+      "final_review_red_count_zero",
+      "artifact_schema_valid",
+      "target_profile_declared",
+      "input_budget_valid"
+    ]
+  }
+}

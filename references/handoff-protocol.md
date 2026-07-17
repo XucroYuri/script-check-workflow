@@ -1,5 +1,11 @@
 # 层间传递协议（Handoff Protocol）
 
+## 机器合同与失败关闭
+
+`contracts/workflow-contract.json` 是 Stage 顺序、必需输入、输出字段、计分规则和硬门槛的唯一机器事实源。本文件负责解释语义，不得定义与机器合同冲突的字段。
+
+任一 `requires` 字段缺失时，orchestrator 必须停止当前运行并输出 `BLOCKED: CONTRACT_ERROR`。不得由下游 Stage 猜测、重算或静默补造缺失字段。
+
 本文件定义Stage之间的信息传递规范，确保上下文隔离的同时支撑必要的跨层依赖。
 
 ---

@@ -186,6 +186,7 @@ from_stage3:
 
 ```yaml
 stage4_metrics:
+  key_action_events: [{location, actor, action, affected_asset}]
   action_complexity: N.N          # 平均动作复杂度(1-10)
   emotion_leakage_count: N        # 画面层情绪泄漏处数
   missing_physics_feedback: N     # 缺失物理反馈的碰撞处数
