@@ -169,7 +169,7 @@ from_stage2:
 ```json
 {
   "shot_count": 2,
-  "scene_shot_map": [{"scene": "S01", "shots": ["S01-SH01"]}],
+  "scene_shot_map": [{"scene": "S01", "shots": ["S01-SH01", "S01-SH02"]}],
   "avg_info_layers": 4.5,
   "format_consistency": 1.0,
   "risk_distribution": {"low": 1, "medium": 1, "high": 0},

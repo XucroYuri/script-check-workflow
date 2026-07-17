@@ -67,6 +67,16 @@ SCORING_RULES = {
 NON_SCORING_RULES = {
     "R4.5.1", "R4.5.2", "R4.5.3", "R4.5.4", "R5.27", "R6.32", "R6.33",
 }
+STAGE_RULE_IDS = {
+    "stage1": ["R1.1", "R1.2", "R1.3", "R1.4"],
+    "stage2": ["R2.5", "R2.6", "R2.7", "R2.8"],
+    "stage3": ["R3.9", "R3.10", "R3.11", "R3.12", "R3.13", "R3.14"],
+    "stage4": ["R4.15", "R4.16", "R4.16.5", "R4.17", "R4.18", "R4.19"],
+    "stage4_5": ["R4.5.1", "R4.5.2", "R4.5.3", "R4.5.4"],
+    "stage5": ["R5.20", "R5.21", "R5.22", "R5.23", "R5.24", "R5.25", "R5.26", "R5.27"],
+    "stage6": ["R6.28", "R6.29", "R6.30", "R6.31", "R6.32", "R6.33"],
+    "stage7": ["R7.34", "R7.35", "R7.36", "R7.37"],
+}
 HARD_GATES = {
     "contract_valid",
     "post_synthesis_review_complete",
@@ -426,10 +436,75 @@ SCHEMA_KEYWORDS = {
 }
 
 
+def _schema_keywords_well_typed(schema: Any) -> bool:
+    if not isinstance(schema, dict) or not set(schema) <= SCHEMA_KEYWORDS:
+        return False
+    if "$schema" in schema and not isinstance(schema["$schema"], str):
+        return False
+    if "type" in schema:
+        schema_type = schema["type"]
+        if not isinstance(schema_type, str) or schema_type not in {
+            "null",
+            "boolean",
+            "integer",
+            "number",
+            "string",
+            "array",
+            "object",
+        }:
+            return False
+    if "additionalProperties" in schema and type(
+        schema["additionalProperties"]
+    ) is not bool:
+        return False
+    if "oneOf" in schema:
+        one_of = schema["oneOf"]
+        if not isinstance(one_of, list) or not one_of:
+            return False
+        if not all(_schema_keywords_well_typed(option) for option in one_of):
+            return False
+    if "enum" in schema and not isinstance(schema["enum"], list):
+        return False
+    if "required" in schema and not _is_list_of_strings(schema["required"]):
+        return False
+    if "properties" in schema:
+        properties = schema["properties"]
+        if not isinstance(properties, dict) or not all(
+            isinstance(name, str) and _schema_keywords_well_typed(subschema)
+            for name, subschema in properties.items()
+        ):
+            return False
+    if "items" in schema and not _schema_keywords_well_typed(schema["items"]):
+        return False
+    if "minItems" in schema and (
+        type(schema["minItems"]) is not int or schema["minItems"] < 0
+    ):
+        return False
+    for keyword in ("minimum", "maximum", "exclusiveMinimum"):
+        boundary = schema.get(keyword)
+        if keyword in schema and (
+            not isinstance(boundary, (int, float))
+            or isinstance(boundary, bool)
+            or (isinstance(boundary, float) and not math.isfinite(boundary))
+        ):
+            return False
+    if "minLength" in schema and (
+        type(schema["minLength"]) is not int or schema["minLength"] < 0
+    ):
+        return False
+    if "pattern" in schema and not isinstance(schema["pattern"], str):
+        return False
+    if "x-fieldOrder" in schema and not _is_list_of_strings(
+        schema["x-fieldOrder"]
+    ):
+        return False
+    return True
+
+
 def validate_schema_instance(value: Any, schema: Any) -> bool:
     """Validate the canonical contract's small JSON-Schema vocabulary."""
 
-    if not isinstance(schema, dict) or not set(schema) <= SCHEMA_KEYWORDS:
+    if not _schema_keywords_well_typed(schema):
         return False
 
     one_of = schema.get("oneOf")
@@ -458,7 +533,7 @@ def validate_schema_instance(value: Any, schema: Any) -> bool:
         if (
             not isinstance(value, (int, float))
             or isinstance(value, bool)
-            or not math.isfinite(value)
+            or (isinstance(value, float) and not math.isfinite(value))
         ):
             return False
     elif expected_type == "string":
@@ -509,9 +584,9 @@ def validate_schema_instance(value: Any, schema: Any) -> bool:
             return False
         extras = set(value) - set(properties)
         additional = schema.get("additionalProperties", True)
-        if additional is False and extras:
+        if type(additional) is not bool:
             return False
-        if additional not in {True, False}:
+        if additional is False and extras:
             return False
         if not all(
             validate_schema_instance(item, properties[name])
@@ -571,7 +646,11 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
         errors.append("fieldSchemas must be an object")
     else:
         for field_name, schema in FIELD_SCHEMAS.items():
-            if field_schemas.get(field_name) != schema:
+            actual_schema = field_schemas.get(field_name)
+            if (
+                not _schema_keywords_well_typed(actual_schema)
+                or actual_schema != schema
+            ):
                 errors.append(field_name + " must use the canonical field schema")
 
     metric_schemas = contract.get("metricSchemas")
@@ -579,7 +658,11 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
         errors.append("metricSchemas must contain the exact eight Stage schemas")
         metric_schemas = {} if not isinstance(metric_schemas, dict) else metric_schemas
     for stage_id in STAGE_ORDER:
-        if metric_schemas.get(stage_id) != METRIC_SCHEMAS[stage_id]:
+        actual_schema = metric_schemas.get(stage_id)
+        if (
+            not _schema_keywords_well_typed(actual_schema)
+            or actual_schema != METRIC_SCHEMAS[stage_id]
+        ):
             errors.append(stage_id + " metrics must use the canonical metric schema")
 
     stages = contract.get("stages")
@@ -599,12 +682,18 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
                 continue
             requires = stage.get("requires")
             produces = stage.get("produces")
+            allowed_rule_ids = stage.get("allowedRuleIds")
             if not _is_list_of_strings(requires):
                 errors.append(stage_id + " requires must be a list of strings")
                 requires = []
             if not _is_list_of_strings(produces):
                 errors.append(stage_id + " produces must be a list of strings")
                 produces = []
+            if allowed_rule_ids != STAGE_RULE_IDS[stage_id]:
+                errors.append(
+                    stage_id
+                    + " allowedRuleIds must contain the exact canonical rule set"
+                )
             expected = STAGE_FIELDS[stage_id]
             if set(requires) != set(expected["requires"]) or len(requires) != len(expected["requires"]):
                 errors.append(stage_id + " requires must contain the exact canonical field set")

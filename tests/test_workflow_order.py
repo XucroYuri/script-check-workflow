@@ -521,6 +521,17 @@ class WorkflowOrderTests(unittest.TestCase):
                     )
                 self.assertEqual(payload, parsed)
 
+    def test_documented_stage3_shot_totals_are_cross_field_consistent(self):
+        metrics = documented_metric_example(
+            STAGE_DOCUMENTS["stage3"], "stage3"
+        )
+        risk_total = sum(metrics["risk_distribution"].values())
+        mapped_shot_total = sum(
+            len(scene["shots"]) for scene in metrics["scene_shot_map"]
+        )
+        self.assertEqual(metrics["shot_count"], risk_total)
+        self.assertEqual(metrics["shot_count"], mapped_shot_total)
+
     def test_handoff_lists_the_exact_canonical_metric_keys(self):
         text = (ROOT / "references/handoff-protocol.md").read_text(encoding="utf-8")
         marker = "<!-- canonical-stage-metric-keys -->"
@@ -673,6 +684,38 @@ class WorkflowOrderTests(unittest.TestCase):
                         stage_id,
                         prerequisites=prerequisites,
                     )
+
+    def test_huge_metric_integer_fails_closed_without_overflow(self):
+        metrics = valid_metrics("stage3")
+        metrics["avg_info_layers"] = 10**1000
+        payload = {"finding": [], "correction_proposal": [], "metrics": metrics}
+        try:
+            policy.parse_stage_output(payload, "stage3")
+        except policy.WorkflowBlocked as exc:
+            self.assertRegex(str(exc), "BLOCKED: INVALID_STAGE_OUTPUT")
+        except OverflowError as exc:
+            self.fail("huge metric integer escaped the policy boundary: {}".format(exc))
+        else:
+            self.fail("out-of-range huge metric integer was accepted")
+
+    def test_huge_invalid_target_profile_integer_is_contract_error(self):
+        profile = valid_target_profile(clip_duration_seconds=-(10**1000))
+        try:
+            policy.parse_stage_output(
+                stage5_payload(False),
+                "stage5",
+                prerequisites={"target_profile": profile},
+            )
+        except policy.WorkflowBlocked as exc:
+            self.assertRegex(str(exc), "BLOCKED: CONTRACT_ERROR")
+        except OverflowError as exc:
+            self.fail(
+                "huge target-profile integer escaped the policy boundary: {}".format(
+                    exc
+                )
+            )
+        else:
+            self.fail("invalid huge target-profile integer was accepted")
 
     def test_stage5_parser_derives_declaration_from_prerequisites(self):
         for profile, declared in ((None, False), (valid_target_profile(), True)):
@@ -853,6 +896,45 @@ class WorkflowOrderTests(unittest.TestCase):
             policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
         ):
             policy.parse_stage_output(false_flagged_blood, "stage7")
+
+    def test_unknown_and_cross_stage_rule_ids_block_proposal_application(self):
+        script = "ORIGINAL"
+        source_hash = policy.source_fragment_sha256(script, 1, 1)
+        for rule_id in ("R999", "R7.34"):
+            with self.subTest(rule_id=rule_id):
+                finding_id = "F-stage1-{}-S01-SH001-001".format(rule_id)
+                unsafe_finding = finding(
+                    finding_id=finding_id,
+                    stage_id="stage1",
+                    rule_id=rule_id,
+                    source_text_sha256=source_hash,
+                )
+                unsafe_proposal = proposal(
+                    proposal_id="P-stage1-{}-S01-SH001-001".format(rule_id),
+                    finding_id=finding_id,
+                    expected_hash=source_hash,
+                    replacement="INJECTED",
+                    states={},
+                )
+                payload = {
+                    "finding": [unsafe_finding],
+                    "correction_proposal": [unsafe_proposal],
+                    "metrics": valid_metrics("stage1"),
+                }
+                try:
+                    parsed = policy.parse_stage_output(payload, "stage1")
+                except policy.WorkflowBlocked as exc:
+                    self.assertRegex(str(exc), "BLOCKED: INVALID_STAGE_OUTPUT")
+                else:
+                    applied = policy.apply_correction_proposals(
+                        script, parsed["correction_proposal"]
+                    )
+                    self.fail(
+                        "{} was accepted and changed the script to {!r}".format(
+                            rule_id, applied
+                        )
+                    )
+        self.assertEqual("ORIGINAL", script)
 
     def test_proposal_writer_flag_must_cover_all_linked_findings(self):
         writer_finding = finding(writer_decision_needed=True)

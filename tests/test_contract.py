@@ -4,7 +4,11 @@ import json
 import unittest
 from pathlib import Path
 
-from scripts.contract import load_contract, validate_contract
+from scripts.contract import (
+    load_contract,
+    validate_contract,
+    validate_schema_instance,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +74,33 @@ class WorkflowContractTests(unittest.TestCase):
                 self.assertFalse(schema["additionalProperties"])
                 self.assertEqual(expected_fields, set(schema["required"]))
                 self.assertEqual(expected_fields, set(schema["properties"]))
+
+    def test_contract_declares_exact_rule_allowlist_for_every_stage(self):
+        expected = {
+            "stage1": ["R1.1", "R1.2", "R1.3", "R1.4"],
+            "stage2": ["R2.5", "R2.6", "R2.7", "R2.8"],
+            "stage3": ["R3.9", "R3.10", "R3.11", "R3.12", "R3.13", "R3.14"],
+            "stage4": ["R4.15", "R4.16", "R4.16.5", "R4.17", "R4.18", "R4.19"],
+            "stage4_5": ["R4.5.1", "R4.5.2", "R4.5.3", "R4.5.4"],
+            "stage5": ["R5.20", "R5.21", "R5.22", "R5.23", "R5.24", "R5.25", "R5.26", "R5.27"],
+            "stage6": ["R6.28", "R6.29", "R6.30", "R6.31", "R6.32", "R6.33"],
+            "stage7": ["R7.34", "R7.35", "R7.36", "R7.37"],
+        }
+        actual = {
+            stage_id: self.contract["stages"][stage_id].get("allowedRuleIds")
+            for stage_id in self.contract["stageOrder"]
+        }
+        self.assertEqual(expected, actual)
+
+    def test_mutated_stage_rule_allowlist_is_invalid(self):
+        contract = deepcopy(self.contract)
+        contract["stages"]["stage1"].setdefault("allowedRuleIds", []).append(
+            "R7.34"
+        )
+        self.assertIn(
+            "stage1 allowedRuleIds must contain the exact canonical rule set",
+            validate_contract(contract),
+        )
 
     def test_contract_declares_full_run_unicode_code_point_limit(self):
         self.assertEqual(
@@ -188,6 +219,48 @@ class WorkflowContractTests(unittest.TestCase):
             "target_profile must use the canonical field schema",
             validate_contract(contract),
         )
+
+    def test_additional_properties_keyword_requires_exact_boolean(self):
+        runtime_schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        }
+        for mutation in (0, 1):
+            with self.subTest(boundary="contract", mutation=mutation):
+                contract = deepcopy(self.contract)
+                contract["fieldSchemas"]["target_profile"]["oneOf"][1][
+                    "additionalProperties"
+                ] = mutation
+                self.assertTrue(
+                    validate_contract(contract),
+                    "numeric additionalProperties must invalidate the contract",
+                )
+            with self.subTest(boundary="runtime", mutation=mutation):
+                schema = deepcopy(runtime_schema)
+                schema["additionalProperties"] = mutation
+                self.assertFalse(
+                    validate_schema_instance({"name": "valid"}, schema),
+                    "runtime must reject a non-boolean schema keyword",
+                )
+
+    def test_unhashable_schema_type_keyword_fails_closed(self):
+        contract = deepcopy(self.contract)
+        contract["metricSchemas"]["stage1"]["properties"]["scene_count"][
+            "type"
+        ] = []
+        try:
+            errors = validate_contract(contract)
+        except TypeError as exc:
+            self.fail("malformed schema type escaped contract validation: {}".format(exc))
+        self.assertTrue(errors)
+
+        try:
+            accepted = validate_schema_instance(1, {"type": []})
+        except TypeError as exc:
+            self.fail("malformed schema type escaped runtime validation: {}".format(exc))
+        self.assertFalse(accepted)
 
     def test_missing_or_mutated_metric_schema_is_invalid(self):
         self.assertIn("metricSchemas", self.contract)

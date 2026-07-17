@@ -68,6 +68,10 @@ if CANONICAL_CONTRACT_ERRORS:
         + "; ".join(CANONICAL_CONTRACT_ERRORS)
     )
 CANONICAL_METRIC_SCHEMAS = CANONICAL_CONTRACT["metricSchemas"]
+CANONICAL_STAGE_RULE_IDS = {
+    stage_id: frozenset(stage["allowedRuleIds"])
+    for stage_id, stage in CANONICAL_CONTRACT["stages"].items()
+}
 
 
 class WorkflowBlocked(ValueError):
@@ -331,7 +335,8 @@ def _valid_finding(record: Any, stage_id: str) -> bool:
             _is_nonempty_string(record.get("location_id")),
             _is_span(record.get("source_span")),
             _is_sha256(record.get("source_text_sha256")),
-            _is_nonempty_string(record.get("rule_id")),
+            record.get("rule_id")
+            in CANONICAL_STAGE_RULE_IDS.get(stage_id, frozenset()),
             record.get("severity") in {"high", "medium", "low"},
             isinstance(record.get("description"), str),
             isinstance(record.get("original"), str),
@@ -417,11 +422,19 @@ def parse_stage_output(
 
     derived_target_profile_declared = None
     if stage_id == "stage5":
-        if not isinstance(prerequisites, Mapping) or "target_profile" not in prerequisites:
+        try:
+            if (
+                not isinstance(prerequisites, Mapping)
+                or "target_profile" not in prerequisites
+            ):
+                raise WorkflowBlocked(CONTRACT_ERROR)
+            derived_target_profile_declared = validate_target_profile_input(
+                prerequisites["target_profile"]
+            )
+        except WorkflowBlocked:
+            raise
+        except (KeyError, TypeError, ArithmeticError):
             raise WorkflowBlocked(CONTRACT_ERROR)
-        derived_target_profile_declared = validate_target_profile_input(
-            prerequisites["target_profile"]
-        )
 
     try:
         if not isinstance(payload, dict) or set(payload) != OUTPUT_COMPONENTS:
@@ -462,6 +475,6 @@ def parse_stage_output(
             is not derived_target_profile_declared
         ):
             raise ValueError
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, ArithmeticError):
         raise WorkflowBlocked(INVALID_STAGE_OUTPUT)
     return payload
