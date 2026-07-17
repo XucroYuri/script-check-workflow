@@ -23,6 +23,8 @@ Stage reviewer 只接收经合同验证的精简 prerequisite、当前 Stage 规
 
 Reviewer 的响应只允许包含 `finding`、`correction_proposal` 和 `metrics` 三个顶层组件。三个组件必须同时存在：前两个是数组（没有记录时使用空数组），`metrics` 是对象。Orchestrator 必须按本文件的 Finding Schema、Correction Proposal Schema 和对应 Stage Metrics Schema 验证全部三个组件；任一必需组件缺失、字段无效、ID 重复或该 Stage 必需 metric 缺失时，必须返回 `BLOCKED: INVALID_STAGE_OUTPUT`，不得从自然语言中推断、补造或重算字段。
 
+Stage output parser 只做上述结构与 Schema 验证，不执行 writer-decision、受保护连续性状态或冲突语义裁决。结构验证通过后，proposal 原样进入 apply 阶段；apply 必须先完成原始快照 span/hash 验证，再执行这些语义规则。
+
 ---
 
 ## Finding 输出Schema

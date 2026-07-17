@@ -366,10 +366,6 @@ def parse_stage_output(payload: Any, stage_id: str) -> Dict[str, Any]:
         }
         if not isinstance(metrics, dict) or set(metrics) != expected_metrics:
             raise ValueError
-        if any(_proposal_has_protected_state(record) for record in proposals):
-            raise WorkflowBlocked("BLOCKED: WRITER_DECISION_REQUIRED")
-    except WorkflowBlocked:
-        raise
     except (KeyError, TypeError, ValueError):
         raise WorkflowBlocked(INVALID_STAGE_OUTPUT)
     return payload

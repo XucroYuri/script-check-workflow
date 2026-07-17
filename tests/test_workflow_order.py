@@ -315,10 +315,48 @@ class WorkflowOrderTests(unittest.TestCase):
         false_flagged_blood["correction_proposal"][0][
             "requires_writer_decision"
         ] = False
+        self.assertEqual(
+            false_flagged_blood,
+            policy.parse_stage_output(false_flagged_blood, "stage7"),
+        )
+
+    def test_parse_then_apply_preserves_snapshot_error_precedence(self):
+        script = "original"
+        stale_payload = {
+            "finding": [finding()],
+            "correction_proposal": [
+                proposal(
+                    proposal_id="P-stage7-R7.34-S01-SH001-001",
+                    finding_id="F-stage7-R7.34-S01-SH001-001",
+                    expected_hash="f" * 64,
+                    states={"prop": "blood"},
+                    writer_decision=False,
+                )
+            ],
+            "metrics": {
+                "team_handoff_score": 0.9,
+                "acceptance_readiness": 0.9,
+                "stage7_pass_rate": 0.9,
+            },
+        }
+        parsed_stale = policy.parse_stage_output(stale_payload, "stage7")
+        with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
+            policy.apply_correction_proposals(
+                script, parsed_stale["correction_proposal"]
+            )
+
+        valid_payload = deepcopy(stale_payload)
+        valid_payload["correction_proposal"][0][
+            "expected_source_sha256"
+        ] = policy.source_fragment_sha256(script, 1, 1)
+        parsed_valid = policy.parse_stage_output(valid_payload, "stage7")
         with self.assertRaisesRegex(
             policy.WorkflowBlocked, "BLOCKED: WRITER_DECISION_REQUIRED"
         ):
-            policy.parse_stage_output(false_flagged_blood, "stage7")
+            policy.apply_correction_proposals(
+                script, parsed_valid["correction_proposal"]
+            )
+        self.assertEqual("original", script)
 
     def test_documented_stage45_example_uses_canonical_separate_records(self):
         continuity = (ROOT / "references/stage4-5-asset-continuity.md").read_text(
