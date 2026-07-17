@@ -109,18 +109,30 @@ from_stage4:
 
 ```yaml
 finding:
-  location: "SCENE 001 / 镜头 12"
+  finding_id: "F-stage4_5-R4.5.1-S01-SH012-001"
+  stage_id: "stage4_5"
+  location_id: "S01-SH012"
+  source_span: {start_line: 84, end_line: 84}
+  source_text_sha256: "4e552328c74ae5e1a6cdf85a1eb0d77ca1ee327e9bbcabfde67a647c407633c2"
   rule_id: "R4.5.1"
-  rule_name: "资产状态跳跃再出现"
-  severity: "高"
-  asset_type: "prop"
-  asset_name: "断刀"
+  severity: "medium"
   description: "断刀在战场事件后重新出现，但剧本未说明其状态是否延续或变化"
   original: "镜头回到地面，角色B跨过刀。"
   corrected: "地面上的断刀保持断裂状态。角色B从断刀旁跨过。"
   correction_basis: "刀已被角色A折断并扔到地上；只延续原文确认的断裂状态，不自动补写污染、位移、遮挡或朝向"
-  writer_decision_needed: false
   confidence: 0.85
+  writer_decision_needed: false
+
+correction_proposal:
+  proposal_id: "P-stage4_5-R4.5.1-S01-SH012-001"
+  finding_ids: ["F-stage4_5-R4.5.1-S01-SH012-001"]
+  location_id: "S01-SH012"
+  source_span: {start_line: 84, end_line: 84}
+  expected_source_sha256: "4e552328c74ae5e1a6cdf85a1eb0d77ca1ee327e9bbcabfde67a647c407633c2"
+  replacement: "地面上的断刀保持断裂状态。角色B从断刀旁跨过。"
+  affected_assets: ["断刀"]
+  asset_state_changes: {"断刀": "confirmed_broken"}
+  requires_writer_decision: false
 ```
 
 上述 `writer_decision_needed: false` 只适用于已确认断裂状态的补写。血迹属于推断，不得进入 low_risk_patch。血迹、位移、遮挡和刀刃朝向只能作为 `writer_decision_needed: true` 的备选方案。

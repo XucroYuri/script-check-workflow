@@ -20,6 +20,27 @@
     "score_candidate",
     "deliver"
   ],
+  "reviewerOutput": {
+    "components": ["finding", "correction_proposal", "metrics"],
+    "invalidStatus": "BLOCKED: INVALID_STAGE_OUTPUT"
+  },
+  "correctionPolicy": {
+    "maxAutomaticCorrectionCycles": 1,
+    "sourceSpanConvention": "one_based_inclusive",
+    "sourceHashConvention": "normalized_lf_utf8_sha256",
+    "conflictTypes": [
+      "overlapping_source_span",
+      "identical_location_id",
+      "incompatible_asset_state"
+    ],
+    "stalePatchStatus": "BLOCKED: STALE_PATCH",
+    "writerDecisionContinuityStates": [
+      "blood",
+      "displacement",
+      "occlusion",
+      "orientation"
+    ]
+  },
   "inputBudget": {
     "maxScriptUnicodeCodePoints": 60000
   },

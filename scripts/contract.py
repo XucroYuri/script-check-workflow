@@ -25,6 +25,27 @@ WORKFLOW_PHASES = [
     "score_candidate",
     "deliver",
 ]
+REVIEWER_OUTPUT = {
+    "components": ["finding", "correction_proposal", "metrics"],
+    "invalidStatus": "BLOCKED: INVALID_STAGE_OUTPUT",
+}
+CORRECTION_POLICY = {
+    "maxAutomaticCorrectionCycles": 1,
+    "sourceSpanConvention": "one_based_inclusive",
+    "sourceHashConvention": "normalized_lf_utf8_sha256",
+    "conflictTypes": [
+        "overlapping_source_span",
+        "identical_location_id",
+        "incompatible_asset_state",
+    ],
+    "stalePatchStatus": "BLOCKED: STALE_PATCH",
+    "writerDecisionContinuityStates": [
+        "blood",
+        "displacement",
+        "occlusion",
+        "orientation",
+    ],
+}
 SCORING_RULES = {
     "R1.1", "R1.2", "R1.3", "R1.4",
     "R2.5", "R2.6", "R2.7", "R2.8",
@@ -130,6 +151,8 @@ REQUIRED_ROOT_KEYS = {
     "contractVersion",
     "stageOrder",
     "workflowPhases",
+    "reviewerOutput",
+    "correctionPolicy",
     "inputBudget",
     "fieldSchemas",
     "stages",
@@ -170,6 +193,12 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
     workflow_phases = contract.get("workflowPhases")
     if not _is_list_of_strings(workflow_phases) or workflow_phases != WORKFLOW_PHASES:
         errors.append("workflowPhases must equal the exact eight workflow phases")
+
+    if contract.get("reviewerOutput") != REVIEWER_OUTPUT:
+        errors.append("reviewerOutput must use the canonical three-component schema")
+
+    if contract.get("correctionPolicy") != CORRECTION_POLICY:
+        errors.append("correctionPolicy must use the canonical closed-loop policy")
 
     input_budget = contract.get("inputBudget")
     if not isinstance(input_budget, dict):
