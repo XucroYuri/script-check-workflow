@@ -161,7 +161,7 @@ git clone "$REPO_URL" script-check-workflow
 **每个Stage的sub-agent只接收：**
 1. 包装在 `<untrusted_script>` 数据块中的当前审查输入全文（首次为原稿，复审为候选稿）
 2. 该Stage对应的规则文件
-3. 上游传递的精简 metrics（不超过 200 token，见 [handoff-protocol](references/handoff-protocol.md)）
+3. 上游传递的规范机器 prerequisite（必须无损完整且不计入摘要上限）；200 token 只限制可选自然语言摘要，见 [handoff-protocol](references/handoff-protocol.md)
 
 **每个Stage的sub-agent绝对不接收：**
 - 其他Stage的原始 findings

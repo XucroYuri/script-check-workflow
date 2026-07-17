@@ -14,10 +14,22 @@
 
 ## 核心原则
 
-1. **只传metrics，不传findings**：下游Stage不知道上游发现了什么问题
-2. **metrics总量≤200 token**：防止上游信息膨胀污染下游判断
-3. **只传该Stage声明需要的字段**：按prerequisite contract严格过滤
-4. **Stage 4.5只传连续性metrics，不传完整账本**：下游Stage可以使用连续性风险数量、视觉锚点更新和待确认数量，但不接收完整推断链，避免把编剧待确认内容误当事实。
+1. **规范机器 prerequisite 必须无损**：只传当前 Stage 在合同中声明的 `requires` 字段，但字段值和嵌套结构必须完整；不传 findings，也不得静默截断、摘要或丢弃数组元素。
+2. **200 token 只限制可选自然语言摘要**：该摘要用于帮助 reviewer 定向阅读，可以完全省略。规范机器 prerequisite 不计入 200 token 上限，不得为了满足摘要预算而改变机器字段。
+3. **失败关闭**：orchestrator 如果不能传递本轮完整 prerequisite 集合，必须停止当前运行并返回 `BLOCKED: CONTRACT_ERROR`，不得让 reviewer 猜测或重算。
+4. **Stage 4.5只传合同声明的连续性metrics，不传完整账本**：下游Stage可以使用连续性风险数量、视觉锚点更新和待确认数量，但不接收完整推断链，避免把编剧待确认内容误当事实。
+
+### 完整性、切片与 provenance
+
+默认传递当前运行的完整 `requires` 集合。只有同时满足以下条件时，才可传递可验证的 current-stage/current-scope slice：
+
+1. slice 包含当前 Stage、当前 scope 所需的每个规范机器 prerequisite，键集合与合同完全一致，值无损且未截断；
+2. scope 边界由 orchestrator 在切片前确定，reviewer 不得自行扩张或缩小；
+3. provenance envelope 同时携带 `contract_version`、`run_id`、`input_sha256`、`current_stage`、`scope_id` 和 `producer_stage_ids`；
+4. 每个 producer 必须属于同一 `run_id` 和 `input_sha256`，且其 Stage 早于当前 Stage；
+5. 无法证明 completeness 或 provenance 时返回 `BLOCKED: CONTRACT_ERROR`。
+
+可选自然语言摘要仍受 200 token 限制；它不是机器 prerequisite，不能替代、修补或覆盖机器值。
 
 ## 信任边界与结构化输出
 
@@ -71,9 +83,14 @@ correction_proposal:
   expected_source_sha256: "64 lowercase hex characters"
   replacement: "建议文本"
   affected_assets: ["角色A"]
-  asset_state_changes: {"角色A": "站立"}  # 可选；用于机器检测同一资产的不兼容状态
+  asset_state_changes:                  # 可选；每项必须是受控 category + 非空 value
+    "角色A": {category: "condition", value: "standing"}
   requires_writer_decision: false
 ```
+
+`asset_state_changes` 的允许 category 只有 `condition`、`blood`、`displacement`、`occlusion`、`orientation`。未知 category、旧式裸字符串或缺失 `category` / `value` 的记录均为 `BLOCKED: INVALID_STAGE_OUTPUT`，不得按低风险纠正应用。
+
+每条 proposal 的 `location_id`、`source_span` 和 `expected_source_sha256` 必须逐一等于全部 linked finding evidence。多个 finding 只有在三项证据指向同一目标时才可合并；否则 proposal 无效。任一 linked finding 的 `writer_decision_needed` 为 true 时，proposal 的 `requires_writer_decision` 必须为 true。
 
 Orchestrator 将以下任一情况视为提案冲突：`source_span` 重叠、`location_id` 相同，或 `affected_assets` 相交且提案要求不兼容的资产状态变化。冲突必须先记录并裁决，不能按返回顺序静默覆盖。
 
@@ -81,69 +98,26 @@ Orchestrator 将以下任一情况视为提案冲突：`source_span` 重叠、`l
 
 应用顺序必须失败关闭：先针对同一份未修改的原始快照验证全部 proposal 的 `source_span` 和 `expected_source_sha256`；任何 span 非法、越界或 hash 不匹配都返回 `BLOCKED: STALE_PATCH`。只有全部快照验证通过后，才检查 writer decision 和 proposal 冲突。因此 `STALE_PATCH` 优先于 `WRITER_DECISION_REQUIRED` 与 `PATCH_CONFLICT`。
 
-`asset_state_changes` 中只要出现 `blood`、`displacement`、`occlusion` 或 `orientation` 分类，即视为受保护的连续性推断，必须返回 `BLOCKED: WRITER_DECISION_REQUIRED`。该规则独立于 reviewer 提供的 `requires_writer_decision`；即使该字段错误地为 `false`，也不得自动应用。
+`asset_state_changes` 的 category 中只要出现 `blood`、`displacement`、`occlusion` 或 `orientation`，即视为受保护的连续性推断。proposal 必须声明 `requires_writer_decision: true`，apply 阶段必须返回 `BLOCKED: WRITER_DECISION_REQUIRED`。例如 value 为 `blood_stained` 时仍由 category `blood` 保护，不能通过语义变体绕过。
 
 ---
 
 ## Metrics 输出Schema
 
-每个Stage执行完毕后，输出精简metrics摘要：
+`contracts/workflow-contract.json` 的 `metricSchemas` 定义值类型、范围和嵌套结构。下面只列出每个 Stage 的精确顶层键；没有额外的 `stage_id`、`stage_name`、`findings_count`、通用 `pass_rate` 或 `key_metrics` 包装层。Finding 记录始终位于独立的 `finding` 组件。
 
-```yaml
-stage_metrics:
-  stage_id: "stage1"
-  stage_name: "总原则检查"
-  findings_count: {high: 3, medium: 5, low: 2}
-  pass_rate: 0.72
-  key_metrics:
-    pronoun_density: 0.15        # 代词占画面描述词数比
-    intent_word_count: 8         # 意图性词汇总数
-    metaphor_count: 3            # 比喻依赖处数量
-    six_layer_coverage: 0.85     # 六层信息覆盖率
-```
-
-### Stage 4.5 Metrics 输出Schema
-
-```yaml
-stage4_5_metrics:
-  stage_id: "stage4_5"
-  stage_name: "资产连续性追踪层"
-  tracked_asset_count:
-    character: 6
-    scene: 3
-    prop: 9
-  continuity_risk_count:
-    high: 2
-    medium: 5
-    low: 8
-  high_risk_asset_jumps:
-    - {asset: "断刀", from: "S01-SH03", to: "S01-SH12"}
-  requires_writer_confirmation_count: 4
-  suggested_visual_anchor_updates:
-    - {asset: "断刀", location: "S01-SH12", reason: "same-location reappearance after battle event"}
-  low_risk_patch_count: 6
-  pass_rate: 0.75
-```
-
-### Stage 5 Metrics 输出Schema
-
-```yaml
-stage5_metrics:
-  target_profile_declared: true
-  generation_risk_score: 2.0
-  anchor_coverage: 0.95
-  visual_nail_count: 4
-  negative_constraint_coverage: 0.90
-  high_risk_shots: 1
-  failure_mode_distribution:
-    face_swap: 0
-    limb_error: 1
-    prop_vanish: 0
-    lr_drift: 0
-    bg_jump: 0
-    action_break: 0
-    occlusion: 0
-  stage5_pass_rate: 0.92
+<!-- canonical-stage-metric-keys -->
+```json
+{
+  "stage1": ["scene_count", "scene_boundaries", "character_count", "pronoun_density", "intent_word_count", "metaphor_count", "six_layer_coverage", "stage1_pass_rate"],
+  "stage2": ["scene_boundaries", "anchor_count_per_scene", "initial_state_completeness", "consistency_score", "atmosphere_specificity", "stage2_pass_rate"],
+  "stage3": ["shot_count", "scene_shot_map", "avg_info_layers", "format_consistency", "risk_distribution", "dual_high_conflict_count", "stage3_pass_rate"],
+  "stage4": ["key_action_events", "action_complexity", "emotion_leakage_count", "missing_physics_feedback", "action_chain_issues", "overloaded_shots", "interaction_risk_count", "stage4_pass_rate"],
+  "stage4_5": ["tracked_asset_count", "continuity_risk_count", "high_risk_asset_jumps", "requires_writer_confirmation_count", "suggested_visual_anchor_updates", "low_risk_patch_count", "stage4_5_pass_rate"],
+  "stage5": ["target_profile_declared", "generation_risk_score", "anchor_coverage", "visual_nail_count", "negative_constraint_coverage", "high_risk_shots", "failure_mode_distribution", "stage5_pass_rate"],
+  "stage6": ["isolation_compliance", "ai_taste_score", "dialogue_mismatch_count", "natural_speech_score", "stage6_pass_rate"],
+  "stage7": ["team_handoff_score", "acceptance_readiness", "stage7_pass_rate"]
+}
 ```
 
 `target_profile_declared` 必须是布尔值。其值仅在 `target_profile` 非 null 且通过 schema 验证时为 true；null 或无效时为 false。无效的非 null 输入同时触发 `BLOCKED: CONTRACT_ERROR`，因此不得进入 Stage reviewer 或被静默当作 null。Orchestrator 必须按 `parse_stage_output(payload, stage_id, prerequisites=None)` 把已验证的 prerequisite 作为第三个参数传入，并只使用 parser 与推导值匹配后的 `target_profile_declared` 作为硬门槛；reviewer 不能自行断言该门槛。
@@ -174,7 +148,7 @@ prerequisite:
     scene_boundaries:           # 继承场景边界
       - {id: "S01", start_line: 1, end_line: 45}
     anchor_count_per_scene:     # 每场景锚点数量
-      - {scene: "S01", anchors: 4}
+      - {scene: "S01", anchors: 4, names: ["门", "灯", "墙面标记", "地面裂缝"]}
 ```
 
 ### Stage 4: 动作表演检查
@@ -195,7 +169,7 @@ prerequisite:
     scene_boundaries:
       - {id: "S01", start_line: 1, end_line: 45}
     anchor_count_per_scene:
-      - {scene: "S01", anchors: 4}
+      - {scene: "S01", anchors: 4, names: ["门", "灯", "墙面标记", "地面裂缝"]}
   from_stage3:
     shot_count: 24
     scene_shot_map:
@@ -252,11 +226,7 @@ prerequisite:
     stage4_5_pass_rate: 0.75
     stage5_pass_rate: 0.60
     stage6_pass_rate: 0.90
-    continuity_risk_high: 2
-    continuity_risk_total: 15
     requires_writer_confirmation_count: 4
-    total_high_findings: 12
-    total_findings: 35
     shot_count: 24
     scene_count: 3
 ```

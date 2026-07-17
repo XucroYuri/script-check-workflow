@@ -157,15 +157,15 @@ from_stage1:
 
 ## Metrics 输出
 
-```yaml
-stage6_metrics:
-  isolation_compliance: 0.XX      # 视听隔离合规率
-  ai_taste_score: N.N             # AI味评分(1-10, 越低越好)
-  dialogue_mismatch_count: N      # 画面-台词不匹配处数
-  natural_speech_score: 0.XX      # 口语自然度评分
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage6 -->
+```json
+{
+  "isolation_compliance": 1.0,
+  "ai_taste_score": 2.0,
+  "dialogue_mismatch_count": 0,
+  "natural_speech_score": 0.9,
+  "stage6_pass_rate": 0.95
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。

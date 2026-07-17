@@ -131,20 +131,20 @@ SFX / UI / 屏显
 
 ## Metrics 输出
 
-```yaml
-stage7_metrics:
-  format_consistency: 0.XX        # 格式一致性评分
-  team_handoff_score:             # 岗位与交接评分
-    director: 0.XX
-    storyboard: 0.XX
-    art: 0.XX
-    animation: 0.XX
-    ai_generation: 0.XX
-    continuity_handoff: 0.XX
-  acceptance_readiness: 0.XX      # 验收就绪度
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage7 -->
+```json
+{
+  "team_handoff_score": {
+    "director": 0.9,
+    "storyboard": 0.9,
+    "art": 0.8,
+    "animation": 0.8,
+    "ai_generation": 0.9,
+    "continuity_handoff": 1.0
+  },
+  "acceptance_readiness": 0.9,
+  "stage7_pass_rate": 0.9
+}
 ```
+
+`format_consistency` 是 Stage 3 的规范 metric；Stage 7 消费前序通过率并输出交接与验收指标，不重复声明该字段。Findings 只存在于独立的 `finding` 组件。

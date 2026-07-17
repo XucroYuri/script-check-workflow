@@ -132,17 +132,18 @@ from_stage1:
 
 ## Metrics 输出
 
-```yaml
-stage2_metrics:
-  scene_boundaries: [{id, start_line, end_line}]
-  anchor_count_per_scene:
-    - {scene: "S01", anchors: N, names: ["锚点A", "锚点B", ...]}
-  initial_state_completeness: 0.XX  # 场景初始状态完整度
-  consistency_score: 0.XX           # 跨镜一致性评分
-  atmosphere_specificity: 0.XX      # 氛围来源具体度
-  findings_count:
-    high: N
-    medium: N
-    low: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage2 -->
+```json
+{
+  "scene_boundaries": [{"id": "S01", "start_line": 1, "end_line": 3}],
+  "anchor_count_per_scene": [
+    {"scene": "S01", "anchors": 2, "names": ["门", "灯"]}
+  ],
+  "initial_state_completeness": 0.8,
+  "consistency_score": 0.9,
+  "atmosphere_specificity": 0.7,
+  "stage2_pass_rate": 0.85
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。

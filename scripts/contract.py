@@ -1,5 +1,7 @@
 import json
+import math
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Union
 
 
@@ -39,7 +41,14 @@ CORRECTION_POLICY = {
         "incompatible_asset_state",
     ],
     "stalePatchStatus": "BLOCKED: STALE_PATCH",
-    "writerDecisionContinuityStates": [
+    "assetStateChangeCategories": [
+        "condition",
+        "blood",
+        "displacement",
+        "occlusion",
+        "orientation",
+    ],
+    "writerDecisionStateCategories": [
         "blood",
         "displacement",
         "occlusion",
@@ -72,9 +81,11 @@ SCENE_BOUNDARIES_SCHEMA = {
     "type": "array",
     "items": {
         "type": "object",
+        "additionalProperties": False,
+        "x-fieldOrder": ["start_line", "end_line"],
         "required": ["id", "start_line", "end_line"],
         "properties": {
-            "id": {"type": "string"},
+            "id": {"type": "string", "minLength": 1},
             "start_line": {"type": "integer", "minimum": 1},
             "end_line": {"type": "integer", "minimum": 1},
         },
@@ -84,12 +95,13 @@ SCENE_SHOT_MAP_SCHEMA = {
     "type": "array",
     "items": {
         "type": "object",
+        "additionalProperties": False,
         "required": ["scene", "shots"],
         "properties": {
-            "scene": {"type": "string"},
+            "scene": {"type": "string", "minLength": 1},
             "shots": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": {"type": "string", "minLength": 1},
                 "minItems": 1,
             },
         },
@@ -99,12 +111,13 @@ KEY_ACTION_EVENTS_SCHEMA = {
     "type": "array",
     "items": {
         "type": "object",
+        "additionalProperties": False,
         "required": ["location", "actor", "action", "affected_asset"],
         "properties": {
-            "location": {"type": "string"},
-            "actor": {"type": "string"},
-            "action": {"type": "string"},
-            "affected_asset": {"type": "string"},
+            "location": {"type": "string", "minLength": 1},
+            "actor": {"type": "string", "minLength": 1},
+            "action": {"type": "string", "minLength": 1},
+            "affected_asset": {"type": "string", "minLength": 1},
         },
     },
 }
@@ -148,6 +161,189 @@ FIELD_SCHEMAS = {
     "key_action_events": KEY_ACTION_EVENTS_SCHEMA,
     "target_profile": TARGET_PROFILE_SCHEMA,
 }
+
+
+def _exact_object(properties: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": list(properties),
+        "properties": properties,
+    }
+
+
+def _nonempty_string() -> Dict[str, Any]:
+    return {"type": "string", "minLength": 1}
+
+
+def _count() -> Dict[str, Any]:
+    return {"type": "integer", "minimum": 0}
+
+
+def _bounded_number(minimum: float, maximum: float) -> Dict[str, Any]:
+    return {
+        "type": "number",
+        "minimum": minimum,
+        "maximum": maximum,
+    }
+
+
+def _ratio() -> Dict[str, Any]:
+    return _bounded_number(0, 1)
+
+
+def _array(item_schema: Dict[str, Any], min_items: int = 0) -> Dict[str, Any]:
+    schema: Dict[str, Any] = {"type": "array", "items": item_schema}
+    if min_items:
+        schema["minItems"] = min_items
+    return schema
+
+
+ANCHOR_COUNT_PER_SCENE_SCHEMA = _array(
+    _exact_object(
+        {
+            "scene": _nonempty_string(),
+            "anchors": _count(),
+            "names": _array(_nonempty_string()),
+        }
+    )
+)
+RISK_DISTRIBUTION_SCHEMA = _exact_object(
+    {"low": _count(), "medium": _count(), "high": _count()}
+)
+TRACKED_ASSET_COUNT_SCHEMA = _exact_object(
+    {"character": _count(), "scene": _count(), "prop": _count()}
+)
+CONTINUITY_RISK_COUNT_SCHEMA = _exact_object(
+    {"high": _count(), "medium": _count(), "low": _count()}
+)
+HIGH_RISK_ASSET_JUMPS_SCHEMA = _array(
+    _exact_object(
+        {
+            "asset": _nonempty_string(),
+            "from": _nonempty_string(),
+            "to": _nonempty_string(),
+        }
+    )
+)
+VISUAL_ANCHOR_UPDATES_SCHEMA = _array(
+    _exact_object(
+        {
+            "asset": _nonempty_string(),
+            "location": _nonempty_string(),
+            "reason": _nonempty_string(),
+        }
+    )
+)
+FAILURE_MODE_DISTRIBUTION_SCHEMA = _exact_object(
+    {
+        "face_swap": _count(),
+        "limb_error": _count(),
+        "prop_vanish": _count(),
+        "lr_drift": _count(),
+        "bg_jump": _count(),
+        "action_break": _count(),
+        "occlusion": _count(),
+    }
+)
+TEAM_HANDOFF_SCORE_SCHEMA = _exact_object(
+    {
+        "director": _ratio(),
+        "storyboard": _ratio(),
+        "art": _ratio(),
+        "animation": _ratio(),
+        "ai_generation": _ratio(),
+        "continuity_handoff": _ratio(),
+    }
+)
+METRIC_SCHEMAS = {
+    "stage1": _exact_object(
+        {
+            "scene_count": _count(),
+            "scene_boundaries": SCENE_BOUNDARIES_SCHEMA,
+            "character_count": _count(),
+            "pronoun_density": _ratio(),
+            "intent_word_count": _count(),
+            "metaphor_count": _count(),
+            "six_layer_coverage": _ratio(),
+            "stage1_pass_rate": _ratio(),
+        }
+    ),
+    "stage2": _exact_object(
+        {
+            "scene_boundaries": SCENE_BOUNDARIES_SCHEMA,
+            "anchor_count_per_scene": ANCHOR_COUNT_PER_SCENE_SCHEMA,
+            "initial_state_completeness": _ratio(),
+            "consistency_score": _ratio(),
+            "atmosphere_specificity": _ratio(),
+            "stage2_pass_rate": _ratio(),
+        }
+    ),
+    "stage3": _exact_object(
+        {
+            "shot_count": _count(),
+            "scene_shot_map": SCENE_SHOT_MAP_SCHEMA,
+            "avg_info_layers": _bounded_number(0, 6),
+            "format_consistency": _ratio(),
+            "risk_distribution": RISK_DISTRIBUTION_SCHEMA,
+            "dual_high_conflict_count": _count(),
+            "stage3_pass_rate": _ratio(),
+        }
+    ),
+    "stage4": _exact_object(
+        {
+            "key_action_events": KEY_ACTION_EVENTS_SCHEMA,
+            "action_complexity": _bounded_number(1, 10),
+            "emotion_leakage_count": _count(),
+            "missing_physics_feedback": _count(),
+            "action_chain_issues": _count(),
+            "overloaded_shots": _count(),
+            "interaction_risk_count": _count(),
+            "stage4_pass_rate": _ratio(),
+        }
+    ),
+    "stage4_5": _exact_object(
+        {
+            "tracked_asset_count": TRACKED_ASSET_COUNT_SCHEMA,
+            "continuity_risk_count": CONTINUITY_RISK_COUNT_SCHEMA,
+            "high_risk_asset_jumps": HIGH_RISK_ASSET_JUMPS_SCHEMA,
+            "requires_writer_confirmation_count": _count(),
+            "suggested_visual_anchor_updates": VISUAL_ANCHOR_UPDATES_SCHEMA,
+            "low_risk_patch_count": _count(),
+            "stage4_5_pass_rate": _ratio(),
+        }
+    ),
+    "stage5": _exact_object(
+        {
+            "target_profile_declared": {"type": "boolean"},
+            "generation_risk_score": _bounded_number(1, 10),
+            "anchor_coverage": _ratio(),
+            "visual_nail_count": _count(),
+            "negative_constraint_coverage": _ratio(),
+            "high_risk_shots": _count(),
+            "failure_mode_distribution": FAILURE_MODE_DISTRIBUTION_SCHEMA,
+            "stage5_pass_rate": _ratio(),
+        }
+    ),
+    "stage6": _exact_object(
+        {
+            "isolation_compliance": _ratio(),
+            "ai_taste_score": _bounded_number(1, 10),
+            "dialogue_mismatch_count": _count(),
+            "natural_speech_score": _ratio(),
+            "stage6_pass_rate": _ratio(),
+        }
+    ),
+    "stage7": _exact_object(
+        {
+            "team_handoff_score": {
+                "oneOf": [_ratio(), TEAM_HANDOFF_SCORE_SCHEMA]
+            },
+            "acceptance_readiness": _ratio(),
+            "stage7_pass_rate": _ratio(),
+        }
+    ),
+}
 STAGE_FIELDS = {
     "stage1": {
         "requires": ["script_text", "run_metadata"],
@@ -190,6 +386,7 @@ REQUIRED_ROOT_KEYS = {
     "correctionPolicy",
     "inputBudget",
     "fieldSchemas",
+    "metricSchemas",
     "stages",
     "scoring",
 }
@@ -208,6 +405,134 @@ def load_contract(path: PathLike) -> Dict[str, Any]:
 
 def _is_list_of_strings(value: Any) -> bool:
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+SCHEMA_KEYWORDS = {
+    "$schema",
+    "type",
+    "oneOf",
+    "enum",
+    "additionalProperties",
+    "required",
+    "properties",
+    "items",
+    "minItems",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "minLength",
+    "pattern",
+    "x-fieldOrder",
+}
+
+
+def validate_schema_instance(value: Any, schema: Any) -> bool:
+    """Validate the canonical contract's small JSON-Schema vocabulary."""
+
+    if not isinstance(schema, dict) or not set(schema) <= SCHEMA_KEYWORDS:
+        return False
+
+    one_of = schema.get("oneOf")
+    if one_of is not None:
+        if not isinstance(one_of, list) or not one_of:
+            return False
+        if sum(validate_schema_instance(value, option) for option in one_of) != 1:
+            return False
+
+    enum = schema.get("enum")
+    if enum is not None:
+        if not isinstance(enum, list) or value not in enum:
+            return False
+
+    expected_type = schema.get("type")
+    if expected_type == "null":
+        if value is not None:
+            return False
+    elif expected_type == "boolean":
+        if not isinstance(value, bool):
+            return False
+    elif expected_type == "integer":
+        if type(value) is not int:
+            return False
+    elif expected_type == "number":
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+        ):
+            return False
+    elif expected_type == "string":
+        if not isinstance(value, str):
+            return False
+    elif expected_type == "array":
+        if not isinstance(value, list):
+            return False
+    elif expected_type == "object":
+        if not isinstance(value, dict):
+            return False
+    elif expected_type is not None:
+        return False
+
+    if expected_type in {"integer", "number"}:
+        if "minimum" in schema and value < schema["minimum"]:
+            return False
+        if "maximum" in schema and value > schema["maximum"]:
+            return False
+        if "exclusiveMinimum" in schema and value <= schema["exclusiveMinimum"]:
+            return False
+
+    if expected_type == "string":
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            return False
+        if "pattern" in schema:
+            try:
+                if re.search(schema["pattern"], value) is None:
+                    return False
+            except (re.error, TypeError):
+                return False
+
+    if expected_type == "array":
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            return False
+        item_schema = schema.get("items")
+        if not isinstance(item_schema, dict):
+            return False
+        if not all(validate_schema_instance(item, item_schema) for item in value):
+            return False
+
+    if expected_type == "object":
+        properties = schema.get("properties")
+        required = schema.get("required")
+        if not isinstance(properties, dict) or not _is_list_of_strings(required):
+            return False
+        if not set(required) <= set(value):
+            return False
+        extras = set(value) - set(properties)
+        additional = schema.get("additionalProperties", True)
+        if additional is False and extras:
+            return False
+        if additional not in {True, False}:
+            return False
+        if not all(
+            validate_schema_instance(item, properties[name])
+            for name, item in value.items()
+            if name in properties
+        ):
+            return False
+        field_order = schema.get("x-fieldOrder")
+        if field_order is not None:
+            if not _is_list_of_strings(field_order) or len(field_order) != 2:
+                return False
+            first, second = field_order
+            if first not in value or second not in value:
+                return False
+            try:
+                if value[first] > value[second]:
+                    return False
+            except TypeError:
+                return False
+
+    return True
 
 
 def validate_contract(contract: Dict[str, Any]) -> List[str]:
@@ -248,6 +573,14 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
         for field_name, schema in FIELD_SCHEMAS.items():
             if field_schemas.get(field_name) != schema:
                 errors.append(field_name + " must use the canonical field schema")
+
+    metric_schemas = contract.get("metricSchemas")
+    if not isinstance(metric_schemas, dict) or set(metric_schemas) != set(STAGE_ORDER):
+        errors.append("metricSchemas must contain the exact eight Stage schemas")
+        metric_schemas = {} if not isinstance(metric_schemas, dict) else metric_schemas
+    for stage_id in STAGE_ORDER:
+        if metric_schemas.get(stage_id) != METRIC_SCHEMAS[stage_id]:
+            errors.append(stage_id + " metrics must use the canonical metric schema")
 
     stages = contract.get("stages")
     valid_stages = isinstance(stages, dict)

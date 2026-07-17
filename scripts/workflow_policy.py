@@ -3,13 +3,16 @@
 from copy import deepcopy
 from hashlib import sha256
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from scripts.contract import (
+    CANONICAL_CONTRACT_PATH,
     CORRECTION_POLICY,
     REVIEWER_OUTPUT,
-    STAGE_FIELDS,
     TARGET_PROFILE_OBJECT_SCHEMA,
+    load_contract,
+    validate_contract,
+    validate_schema_instance,
 )
 
 
@@ -18,8 +21,11 @@ CONTRACT_ERROR = "BLOCKED: CONTRACT_ERROR"
 MAX_AUTOMATIC_CORRECTION_CYCLES = CORRECTION_POLICY[
     "maxAutomaticCorrectionCycles"
 ]
-WRITER_DECISION_CONTINUITY_STATES = frozenset(
-    CORRECTION_POLICY["writerDecisionContinuityStates"]
+ASSET_STATE_CHANGE_CATEGORIES = frozenset(
+    CORRECTION_POLICY["assetStateChangeCategories"]
+)
+WRITER_DECISION_STATE_CATEGORIES = frozenset(
+    CORRECTION_POLICY["writerDecisionStateCategories"]
 )
 
 FINDING_FIELDS = frozenset(
@@ -54,11 +60,14 @@ PROPOSAL_FIELDS = frozenset(
 OPTIONAL_PROPOSAL_FIELDS = frozenset({"asset_state_changes"})
 OUTPUT_COMPONENTS = frozenset(REVIEWER_OUTPUT["components"])
 HASH_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
-ASPECT_RATIO_PATTERN = re.compile(r"[1-9][0-9]*:[1-9][0-9]*\Z")
-TARGET_PROFILE_FIELDS = frozenset(TARGET_PROFILE_OBJECT_SCHEMA["required"])
-TARGET_PROFILE_MODES = frozenset(
-    TARGET_PROFILE_OBJECT_SCHEMA["properties"]["mode"]["enum"]
-)
+CANONICAL_CONTRACT = load_contract(CANONICAL_CONTRACT_PATH)
+CANONICAL_CONTRACT_ERRORS = validate_contract(CANONICAL_CONTRACT)
+if CANONICAL_CONTRACT_ERRORS:
+    raise RuntimeError(
+        "canonical workflow contract is invalid: "
+        + "; ".join(CANONICAL_CONTRACT_ERRORS)
+    )
+CANONICAL_METRIC_SCHEMAS = CANONICAL_CONTRACT["metricSchemas"]
 
 
 class WorkflowBlocked(ValueError):
@@ -90,25 +99,7 @@ def _is_sha256(value: Any) -> bool:
 def target_profile_declared_gate(target_profile: Any) -> bool:
     """Derive the target-profile hard gate without coercing invalid input."""
 
-    if not isinstance(target_profile, dict) or set(target_profile) != TARGET_PROFILE_FIELDS:
-        return False
-    duration = target_profile.get("clip_duration_seconds")
-    mode = target_profile.get("mode")
-    return all(
-        (
-            _is_nonempty_string(target_profile.get("provider")),
-            _is_nonempty_string(target_profile.get("model")),
-            _is_nonempty_string(target_profile.get("model_version")),
-            isinstance(mode, str) and mode in TARGET_PROFILE_MODES,
-            isinstance(duration, (int, float))
-            and not isinstance(duration, bool)
-            and duration > 0,
-            isinstance(target_profile.get("aspect_ratio"), str)
-            and ASPECT_RATIO_PATTERN.fullmatch(target_profile["aspect_ratio"])
-            is not None,
-            isinstance(target_profile.get("reference_assets_available"), bool),
-        )
-    )
+    return validate_schema_instance(target_profile, TARGET_PROFILE_OBJECT_SCHEMA)
 
 
 def validate_target_profile_input(target_profile: Any) -> bool:
@@ -230,9 +221,26 @@ def _proposal_conflicts(proposals: Sequence[Mapping[str, Any]]) -> bool:
 def _proposal_has_protected_state(proposal: Mapping[str, Any]) -> bool:
     state_changes = proposal.get("asset_state_changes", {})
     return isinstance(state_changes, dict) and any(
-        isinstance(state, str) and state in WRITER_DECISION_CONTINUITY_STATES
-        for state in state_changes.values()
+        change["category"] in WRITER_DECISION_STATE_CATEGORIES
+        for change in state_changes.values()
     )
+
+
+def _valid_asset_state_changes(
+    state_changes: Any, affected_assets: Any
+) -> bool:
+    if not isinstance(state_changes, dict) or not isinstance(affected_assets, list):
+        return False
+    if not set(state_changes) <= set(affected_assets):
+        return False
+    for change in state_changes.values():
+        if not isinstance(change, dict) or set(change) != {"category", "value"}:
+            return False
+        if change.get("category") not in ASSET_STATE_CHANGE_CATEGORIES:
+            return False
+        if not _is_nonempty_string(change.get("value")):
+            return False
+    return True
 
 
 def _validate_proposals_against_snapshot(
@@ -260,6 +268,13 @@ def apply_correction_proposals(
 
     _validate_proposals_against_snapshot(script, proposals)
 
+    if any(
+        not _valid_asset_state_changes(
+            item.get("asset_state_changes", {}), item.get("affected_assets")
+        )
+        for item in proposals
+    ):
+        raise WorkflowBlocked(INVALID_STAGE_OUTPUT)
     if any(
         item.get("requires_writer_decision") is True
         or _proposal_has_protected_state(item)
@@ -300,7 +315,9 @@ def select_delivery_artifacts(delivery_status: str) -> Tuple[str, str, str]:
 
 
 def continuity_state_requires_writer_decision(state: str) -> bool:
-    return state in WRITER_DECISION_CONTINUITY_STATES
+    return (
+        isinstance(state, str) and state in WRITER_DECISION_STATE_CATEGORIES
+    )
 
 
 def _valid_finding(record: Any, stage_id: str) -> bool:
@@ -328,7 +345,9 @@ def _valid_finding(record: Any, stage_id: str) -> bool:
     )
 
 
-def _valid_proposal(record: Any, finding_ids: Iterable[str]) -> bool:
+def _valid_proposal(
+    record: Any, findings_by_id: Mapping[str, Mapping[str, Any]]
+) -> bool:
     if not isinstance(record, dict):
         return False
     fields = set(record)
@@ -342,7 +361,8 @@ def _valid_proposal(record: Any, finding_ids: Iterable[str]) -> bool:
     if (
         not isinstance(linked_findings, list)
         or not linked_findings
-        or not all(item in finding_ids for item in linked_findings)
+        or len(linked_findings) != len(set(linked_findings))
+        or not all(item in findings_by_id for item in linked_findings)
     ):
         return False
     if (
@@ -356,13 +376,9 @@ def _valid_proposal(record: Any, finding_ids: Iterable[str]) -> bool:
         or len(assets) != len(set(assets))
     ):
         return False
-    if (
-        not isinstance(state_changes, dict)
-        or not set(state_changes) <= set(assets)
-        or not all(_is_nonempty_string(state) for state in state_changes.values())
-    ):
+    if not _valid_asset_state_changes(state_changes, assets):
         return False
-    return all(
+    if not all(
         (
             _is_nonempty_string(record.get("location_id")),
             _is_span(record.get("source_span")),
@@ -370,7 +386,26 @@ def _valid_proposal(record: Any, finding_ids: Iterable[str]) -> bool:
             isinstance(record.get("replacement"), str),
             isinstance(record.get("requires_writer_decision"), bool),
         )
-    )
+    ):
+        return False
+
+    linked_records = [findings_by_id[item] for item in linked_findings]
+    if any(
+        finding["location_id"] != record["location_id"]
+        or finding["source_span"] != record["source_span"]
+        or finding["source_text_sha256"] != record["expected_source_sha256"]
+        for finding in linked_records
+    ):
+        return False
+    if any(finding["writer_decision_needed"] for finding in linked_records) and not record[
+        "requires_writer_decision"
+    ]:
+        return False
+    if _proposal_has_protected_state(record) and not record[
+        "requires_writer_decision"
+    ]:
+        return False
+    return True
 
 
 def parse_stage_output(
@@ -410,23 +445,16 @@ def parse_stage_output(
         ]
         if finding_ids != expected_ids:
             raise ValueError
+        findings_by_id = {record["finding_id"]: record for record in findings}
         if not isinstance(proposals, list) or not all(
-            _valid_proposal(record, finding_ids) for record in proposals
+            _valid_proposal(record, findings_by_id) for record in proposals
         ):
             raise ValueError
         proposal_ids = [record["proposal_id"] for record in proposals]
         if len(proposal_ids) != len(set(proposal_ids)):
             raise ValueError
-        expected_metrics = {
-            field
-            for field in STAGE_FIELDS[stage_id]["produces"]
-            if not field.endswith("_findings")
-        }
-        if not isinstance(metrics, dict) or set(metrics) != expected_metrics:
-            raise ValueError
-        if stage_id == "stage5" and not isinstance(
-            metrics.get("target_profile_declared"), bool
-        ):
+        metric_schema = CANONICAL_METRIC_SCHEMAS.get(stage_id)
+        if metric_schema is None or not validate_schema_instance(metrics, metric_schema):
             raise ValueError
         if (
             stage_id == "stage5"

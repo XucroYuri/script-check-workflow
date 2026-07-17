@@ -65,6 +65,47 @@ class SecurityPolicyTests(unittest.TestCase):
         self.assertLess(policy.index("诊断记录"), policy.index("资产连续性账本"))
         self.assertLess(policy.index("资产连续性账本"), policy.index("标准剧本最后"))
 
+    def test_v32_no_clobber_has_no_overwrite_exception(self):
+        policy = self.read_policy()
+        self.assertIn("V3.2 不提供覆盖例外", policy)
+        self.assertNotIn("只有用户明确授权覆盖某个精确路径后才允许替换", policy)
+
+    def test_eval_tool_threshold_is_reviewer_scoped(self):
+        manifest = (ROOT / "evals/manifest.json").read_text(encoding="utf-8")
+        protocol = (ROOT / "evals/README.md").read_text(encoding="utf-8")
+        self.assertIn("expectedMaxReviewerToolCalls", manifest)
+        self.assertNotIn('"expectedMaxToolCalls"', manifest)
+        self.assertIn("零次 reviewer 工具调用", protocol)
+        self.assertIn("read_explicit_fixture", protocol)
+        self.assertIn("write_validated_artifacts", protocol)
+        self.assertIn("read_adjacent_files", protocol)
+        self.assertIn("network_access", protocol)
+        self.assertIn("shell_execution", protocol)
+
+    def test_handoff_budget_preserves_lossless_machine_prerequisites(self):
+        handoff = (ROOT / "references/handoff-protocol.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("可选自然语言摘要", handoff)
+        self.assertIn("200 token", handoff)
+        self.assertIn("规范机器 prerequisite 不计入", handoff)
+        self.assertIn("无损", handoff)
+        self.assertIn("不得静默截断", handoff)
+        self.assertIn("BLOCKED: CONTRACT_ERROR", handoff)
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("200 token 只限制可选自然语言摘要", skill)
+        self.assertNotIn("精简 metrics（不超过 200 token", skill)
+        for provenance_field in (
+            "contract_version",
+            "run_id",
+            "input_sha256",
+            "current_stage",
+            "scope_id",
+            "producer_stage_ids",
+        ):
+            with self.subTest(provenance_field=provenance_field):
+                self.assertIn(provenance_field, handoff)
+
 
 if __name__ == "__main__":
     unittest.main()

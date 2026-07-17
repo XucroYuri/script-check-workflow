@@ -1,5 +1,7 @@
 from copy import deepcopy
 from hashlib import sha256
+import json
+import math
 import unittest
 from pathlib import Path
 
@@ -22,6 +24,16 @@ EXPECTED_PHASES = [
     "score_candidate",
     "deliver",
 ]
+STAGE_DOCUMENTS = {
+    "stage1": "references/stage1-principles.md",
+    "stage2": "references/stage2-scene.md",
+    "stage3": "references/stage3-shot.md",
+    "stage4": "references/stage4-action.md",
+    "stage4_5": "references/stage4-5-asset-continuity.md",
+    "stage5": "references/stage5-ai-adapt.md",
+    "stage6": "references/stage6-dialogue.md",
+    "stage7": "references/stage7-industrial.md",
+}
 
 
 def proposal(
@@ -38,7 +50,11 @@ def proposal(
     writer_decision=False,
 ):
     assets = ["prop"] if assets is None else assets
-    states = {"prop": "broken"} if states is None else states
+    states = (
+        {"prop": {"category": "condition", "value": "broken"}}
+        if states is None
+        else states
+    )
     return {
         "proposal_id": proposal_id,
         "finding_ids": [finding_id],
@@ -106,20 +122,110 @@ def stage5_payload(target_profile_declared):
             "visual_nail_count": 1,
             "negative_constraint_coverage": 1.0,
             "high_risk_shots": 0,
-            "failure_mode_distribution": {},
+            "failure_mode_distribution": {
+                "face_swap": 0,
+                "limb_error": 0,
+                "prop_vanish": 0,
+                "lr_drift": 0,
+                "bg_jump": 0,
+                "action_break": 0,
+                "occlusion": 0,
+            },
             "stage5_pass_rate": 1.0,
         },
     }
 
 
-def documented_stage5_metric_fields(relative_path):
+def documented_metric_example(relative_path, stage_id):
     text = (ROOT / relative_path).read_text(encoding="utf-8")
-    block = text.split("stage5_metrics:", 1)[1].split("```", 1)[0]
-    return {
-        line.strip().split(":", 1)[0]
-        for line in block.splitlines()
-        if line.startswith("  ") and not line.startswith("    ")
+    marker = "<!-- canonical-metrics:{} -->".format(stage_id)
+    if marker not in text:
+        raise AssertionError("{} is missing {}".format(relative_path, marker))
+    block = text.split(marker, 1)[1].split("```json", 1)[1].split("```", 1)[0]
+    return json.loads(block)
+
+
+def valid_metrics(stage_id):
+    examples = {
+        "stage1": {
+            "scene_count": 1,
+            "scene_boundaries": [{"id": "S01", "start_line": 1, "end_line": 3}],
+            "character_count": 2,
+            "pronoun_density": 0.1,
+            "intent_word_count": 0,
+            "metaphor_count": 0,
+            "six_layer_coverage": 0.8,
+            "stage1_pass_rate": 0.9,
+        },
+        "stage2": {
+            "scene_boundaries": [{"id": "S01", "start_line": 1, "end_line": 3}],
+            "anchor_count_per_scene": [
+                {"scene": "S01", "anchors": 2, "names": ["door", "lamp"]}
+            ],
+            "initial_state_completeness": 0.8,
+            "consistency_score": 0.9,
+            "atmosphere_specificity": 0.7,
+            "stage2_pass_rate": 0.85,
+        },
+        "stage3": {
+            "shot_count": 2,
+            "scene_shot_map": [{"scene": "S01", "shots": ["S01-SH01"]}],
+            "avg_info_layers": 4.5,
+            "format_consistency": 1.0,
+            "risk_distribution": {"low": 1, "medium": 1, "high": 0},
+            "dual_high_conflict_count": 0,
+            "stage3_pass_rate": 0.9,
+        },
+        "stage4": {
+            "key_action_events": [
+                {
+                    "location": "S01-SH01",
+                    "actor": "A",
+                    "action": "opens",
+                    "affected_asset": "door",
+                }
+            ],
+            "action_complexity": 3.0,
+            "emotion_leakage_count": 0,
+            "missing_physics_feedback": 0,
+            "action_chain_issues": 0,
+            "overloaded_shots": 0,
+            "interaction_risk_count": 0,
+            "stage4_pass_rate": 1.0,
+        },
+        "stage4_5": {
+            "tracked_asset_count": {"character": 2, "scene": 1, "prop": 1},
+            "continuity_risk_count": {"high": 0, "medium": 0, "low": 1},
+            "high_risk_asset_jumps": [],
+            "requires_writer_confirmation_count": 0,
+            "suggested_visual_anchor_updates": [
+                {"asset": "door", "location": "S01-SH01", "reason": "continuity"}
+            ],
+            "low_risk_patch_count": 1,
+            "stage4_5_pass_rate": 1.0,
+        },
+        "stage5": stage5_payload(True)["metrics"],
+        "stage6": {
+            "isolation_compliance": 1.0,
+            "ai_taste_score": 2.0,
+            "dialogue_mismatch_count": 0,
+            "natural_speech_score": 0.9,
+            "stage6_pass_rate": 0.95,
+        },
+        "stage7": {
+            "team_handoff_score": {
+                "director": 0.9,
+                "storyboard": 0.9,
+                "art": 0.8,
+                "animation": 0.8,
+                "ai_generation": 0.9,
+                "continuity_handoff": 1.0,
+            },
+            "acceptance_readiness": 0.9,
+            "stage7_pass_rate": 0.9,
+        },
     }
+    return deepcopy(examples[stage_id])
 
 
 class WorkflowOrderTests(unittest.TestCase):
@@ -139,9 +245,15 @@ class WorkflowOrderTests(unittest.TestCase):
         self.assertEqual(1, correction["maxAutomaticCorrectionCycles"])
         self.assertEqual("one_based_inclusive", correction["sourceSpanConvention"])
         self.assertEqual("normalized_lf_utf8_sha256", correction["sourceHashConvention"])
+        self.assertIn("writerDecisionStateCategories", correction)
+        self.assertIn("assetStateChangeCategories", correction)
         self.assertEqual(
             ["blood", "displacement", "occlusion", "orientation"],
-            correction["writerDecisionContinuityStates"],
+            correction["writerDecisionStateCategories"],
+        )
+        self.assertEqual(
+            ["condition", "blood", "displacement", "occlusion", "orientation"],
+            correction["assetStateChangeCategories"],
         )
 
         mutated = deepcopy(self.contract)
@@ -168,7 +280,7 @@ class WorkflowOrderTests(unittest.TestCase):
             start_line=5,
             end_line=7,
             assets=["other"],
-            states={"other": "clean"},
+            states={"other": {"category": "condition", "value": "clean"}},
         )
         self.assertIn("overlapping_source_span", policy.conflict_reasons(left, right))
 
@@ -180,7 +292,7 @@ class WorkflowOrderTests(unittest.TestCase):
             start_line=3,
             end_line=3,
             assets=["other"],
-            states={"other": "clean"},
+            states={"other": {"category": "condition", "value": "clean"}},
         )
         self.assertIn("identical_location_id", policy.conflict_reasons(left, right))
 
@@ -192,7 +304,7 @@ class WorkflowOrderTests(unittest.TestCase):
             location_id="S02-SH001",
             start_line=3,
             end_line=3,
-            states={"prop": "intact"},
+            states={"prop": {"category": "condition", "value": "intact"}},
         )
         self.assertIn(
             "incompatible_asset_state", policy.conflict_reasons(left, right)
@@ -206,7 +318,7 @@ class WorkflowOrderTests(unittest.TestCase):
     def test_stale_hash_wins_over_writer_decision(self):
         stale_and_protected = proposal(
             expected_hash="f" * 64,
-            states={"prop": "blood"},
+            states={"prop": {"category": "blood", "value": "blood_stained"}},
             writer_decision=True,
         )
         with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
@@ -216,7 +328,7 @@ class WorkflowOrderTests(unittest.TestCase):
         invalid = proposal(
             start_line=0,
             end_line=1,
-            states={"prop": "blood"},
+            states={"prop": {"category": "blood", "value": "blood_stained"}},
             writer_decision=True,
         )
         conflicting = proposal(
@@ -225,7 +337,7 @@ class WorkflowOrderTests(unittest.TestCase):
             start_line=1,
             end_line=1,
             expected_hash=policy.source_fragment_sha256("original", 1, 1),
-            states={"prop": "intact"},
+            states={"prop": {"category": "condition", "value": "intact"}},
         )
         with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
             policy.apply_correction_proposals("original", [invalid, conflicting])
@@ -257,7 +369,7 @@ class WorkflowOrderTests(unittest.TestCase):
         source_hash = policy.source_fragment_sha256(script, 1, 1)
         protected = proposal(
             expected_hash=source_hash,
-            states={"prop": "blood"},
+            states={"prop": {"category": "blood", "value": "blood_stained"}},
             writer_decision=False,
         )
         with self.assertRaisesRegex(
@@ -265,6 +377,22 @@ class WorkflowOrderTests(unittest.TestCase):
         ):
             policy.apply_correction_proposals(script, [protected])
         self.assertEqual("original", script)
+
+    def test_unknown_or_malformed_state_category_fails_closed(self):
+        script = "original"
+        source_hash = policy.source_fragment_sha256(script, 1, 1)
+        invalid_states = (
+            {"prop": {"category": "contamination", "value": "dirty"}},
+            {"prop": "blood_stained"},
+            {"prop": {"category": "blood"}},
+        )
+        for states in invalid_states:
+            with self.subTest(states=states):
+                invalid = proposal(expected_hash=source_hash, states=states)
+                with self.assertRaisesRegex(
+                    policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+                ):
+                    policy.apply_correction_proposals(script, [invalid])
 
     def test_blocked_delivery_selects_candidate_and_never_standardized(self):
         artifacts = policy.select_delivery_artifacts("BLOCKED")
@@ -328,7 +456,15 @@ class WorkflowOrderTests(unittest.TestCase):
             "visual_nail_count": 1,
             "negative_constraint_coverage": 1.0,
             "high_risk_shots": 0,
-            "failure_mode_distribution": {},
+            "failure_mode_distribution": {
+                "face_swap": 0,
+                "limb_error": 0,
+                "prop_vanish": 0,
+                "lr_drift": 0,
+                "bg_jump": 0,
+                "action_break": 0,
+                "occlusion": 0,
+            },
             "stage5_pass_rate": 1.0,
         }
         payload = {"finding": [], "correction_proposal": [], "metrics": metrics}
@@ -361,24 +497,182 @@ class WorkflowOrderTests(unittest.TestCase):
                         prerequisites={"target_profile": valid_target_profile()},
                     )
 
-    def test_documented_stage5_metrics_parse_with_findings_and_proposals(self):
-        payload = stage5_payload(True)
-        metric_fields = set(payload["metrics"])
-        self.assertEqual(
-            metric_fields,
-            documented_stage5_metric_fields("references/handoff-protocol.md"),
+    def test_documented_metric_example_for_every_stage_parses(self):
+        for stage_id, relative_path in STAGE_DOCUMENTS.items():
+            with self.subTest(stage_id=stage_id):
+                metrics = documented_metric_example(relative_path, stage_id)
+                payload = {
+                    "finding": [],
+                    "correction_proposal": [],
+                    "metrics": metrics,
+                }
+                prerequisites = (
+                    {"target_profile": valid_target_profile()}
+                    if stage_id == "stage5"
+                    else None
+                )
+                try:
+                    parsed = policy.parse_stage_output(
+                        payload, stage_id, prerequisites=prerequisites
+                    )
+                except Exception as exc:
+                    self.fail(
+                        "documented {} metrics must parse: {}".format(stage_id, exc)
+                    )
+                self.assertEqual(payload, parsed)
+
+    def test_handoff_lists_the_exact_canonical_metric_keys(self):
+        text = (ROOT / "references/handoff-protocol.md").read_text(encoding="utf-8")
+        marker = "<!-- canonical-stage-metric-keys -->"
+        self.assertIn(marker, text)
+        block = text.split(marker, 1)[1].split("```json", 1)[1].split("```", 1)[0]
+        documented = json.loads(block)
+        expected = {
+            stage_id: [
+                field
+                for field in self.contract["stages"][stage_id]["produces"]
+                if not field.endswith("_findings")
+            ]
+            for stage_id in self.contract["stageOrder"]
+        }
+        self.assertEqual(expected, documented)
+
+    def test_handoff_prerequisite_examples_match_declared_requires(self):
+        text = (ROOT / "references/handoff-protocol.md").read_text(encoding="utf-8")
+        stage3 = text.split("### Stage 3: 镜头级检查", 1)[1].split(
+            "### Stage 4: 动作表演检查", 1
+        )[0]
+        stage4_5 = text.split("### Stage 4.5: 资产连续性追踪层", 1)[1].split(
+            "### Stage 5: AI生成适配检查", 1
+        )[0]
+        self.assertIn("names:", stage3)
+        self.assertIn("names:", stage4_5)
+
+        stage7 = text.split("### Stage 7: 工业化检查", 1)[1].split("---", 1)[0]
+        for field in self.contract["stages"]["stage7"]["requires"]:
+            if field != "script_text":
+                with self.subTest(required_field=field):
+                    self.assertIn(field, stage7)
+        for stale_field in (
+            "continuity_risk_high",
+            "continuity_risk_total",
+            "total_high_findings",
+            "total_findings",
+        ):
+            with self.subTest(stale_field=stale_field):
+                self.assertNotIn(stale_field, stage7)
+
+        continuity = (ROOT / "references/stage4-5-asset-continuity.md").read_text(
+            encoding="utf-8"
         )
-        self.assertEqual(
-            metric_fields,
-            documented_stage5_metric_fields("references/stage5-ai-adapt.md"),
+        downstream = continuity.split("## 下游handoff", 1)[1].split(
+            "## 非计分说明", 1
+        )[0]
+        self.assertNotIn("continuity_risk_high", downstream)
+        self.assertNotIn("continuity_risk_total", downstream)
+
+    def test_metric_values_fail_closed_for_types_ranges_and_nested_shapes(self):
+        cases = []
+
+        def add(name, stage_id, field, value):
+            metrics = valid_metrics(stage_id)
+            metrics[field] = value
+            cases.append((name, stage_id, metrics))
+
+        add("integer string", "stage1", "scene_count", "not-an-integer")
+        add("integer bool", "stage1", "scene_count", True)
+        add("negative count", "stage1", "character_count", -1)
+        add("object pass rate", "stage1", "stage1_pass_rate", {})
+        add("pass rate above one", "stage2", "stage2_pass_rate", 1.01)
+        add("negative ratio", "stage2", "consistency_score", -0.01)
+        add("nan", "stage3", "stage3_pass_rate", math.nan)
+        add("positive infinity", "stage3", "avg_info_layers", math.inf)
+        add("negative infinity", "stage6", "ai_taste_score", -math.inf)
+        add("scene boundaries string", "stage1", "scene_boundaries", "S01")
+        add(
+            "scene boundary extra property",
+            "stage1",
+            "scene_boundaries",
+            [{"id": "S01", "start_line": 1, "end_line": 3, "extra": True}],
         )
-        try:
-            parsed = policy.parse_stage_output(
-                payload, "stage5", prerequisites={"target_profile": valid_target_profile()}
-            )
-        except Exception as exc:
-            self.fail("documented Stage 5 payload must parse: {}".format(exc))
-        self.assertEqual(payload, parsed)
+        add(
+            "scene boundary reversed line span",
+            "stage1",
+            "scene_boundaries",
+            [{"id": "S01", "start_line": 3, "end_line": 1}],
+        )
+        add(
+            "anchor name non-string",
+            "stage2",
+            "anchor_count_per_scene",
+            [{"scene": "S01", "anchors": 1, "names": [1]}],
+        )
+        add(
+            "empty scene shot list",
+            "stage3",
+            "scene_shot_map",
+            [{"scene": "S01", "shots": []}],
+        )
+        add(
+            "risk distribution extra property",
+            "stage3",
+            "risk_distribution",
+            {"low": 1, "medium": 0, "high": 0, "unknown": 0},
+        )
+        add(
+            "action event missing string",
+            "stage4",
+            "key_action_events",
+            [
+                {
+                    "location": "S01-SH01",
+                    "actor": "A",
+                    "action": "opens",
+                    "affected_asset": 7,
+                }
+            ],
+        )
+        add(
+            "anchor update missing property",
+            "stage4_5",
+            "suggested_visual_anchor_updates",
+            [{"asset": "door", "location": "S01-SH01"}],
+        )
+        add(
+            "failure mode extra property",
+            "stage5",
+            "failure_mode_distribution",
+            dict(valid_metrics("stage5")["failure_mode_distribution"], unknown=0),
+        )
+        add("generation risk above ten", "stage5", "generation_risk_score", 10.1)
+        add("AI taste below one", "stage6", "ai_taste_score", 0.9)
+        add(
+            "handoff score extra property",
+            "stage7",
+            "team_handoff_score",
+            dict(valid_metrics("stage7")["team_handoff_score"], extra=1.0),
+        )
+        add("acceptance above one", "stage7", "acceptance_readiness", 1.1)
+
+        for name, stage_id, metrics in cases:
+            with self.subTest(name=name, stage_id=stage_id):
+                prerequisites = (
+                    {"target_profile": valid_target_profile()}
+                    if stage_id == "stage5"
+                    else None
+                )
+                with self.assertRaisesRegex(
+                    policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+                ):
+                    policy.parse_stage_output(
+                        {
+                            "finding": [],
+                            "correction_proposal": [],
+                            "metrics": metrics,
+                        },
+                        stage_id,
+                        prerequisites=prerequisites,
+                    )
 
     def test_stage5_parser_derives_declaration_from_prerequisites(self):
         for profile, declared in ((None, False), (valid_target_profile(), True)):
@@ -508,6 +802,7 @@ class WorkflowOrderTests(unittest.TestCase):
                     proposal_id="P-stage7-R7.34-S01-SH001-001",
                     finding_id="F-stage7-R7.34-S01-SH001-001",
                     expected_hash="0" * 64,
+                    states={},
                 )
             ],
             "metrics": {
@@ -549,27 +844,109 @@ class WorkflowOrderTests(unittest.TestCase):
 
         false_flagged_blood = deepcopy(payload)
         false_flagged_blood["correction_proposal"][0]["asset_state_changes"] = {
-            "prop": "blood"
+            "prop": {"category": "blood", "value": "blood_stained"}
         }
         false_flagged_blood["correction_proposal"][0][
             "requires_writer_decision"
         ] = False
-        self.assertEqual(
-            false_flagged_blood,
-            policy.parse_stage_output(false_flagged_blood, "stage7"),
-        )
+        with self.assertRaisesRegex(
+            policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+        ):
+            policy.parse_stage_output(false_flagged_blood, "stage7")
 
-    def test_parse_then_apply_preserves_snapshot_error_precedence(self):
-        script = "original"
-        stale_payload = {
+    def test_proposal_writer_flag_must_cover_all_linked_findings(self):
+        writer_finding = finding(writer_decision_needed=True)
+        linked_proposal = proposal(
+            proposal_id="P-stage7-R7.34-S01-SH001-001",
+            finding_id="F-stage7-R7.34-S01-SH001-001",
+            writer_decision=False,
+            states={},
+        )
+        payload = {
+            "finding": [writer_finding],
+            "correction_proposal": [linked_proposal],
+            "metrics": valid_metrics("stage7"),
+        }
+        with self.assertRaisesRegex(
+            policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+        ):
+            policy.parse_stage_output(payload, "stage7")
+
+        payload["correction_proposal"][0]["requires_writer_decision"] = True
+        self.assertEqual(payload, policy.parse_stage_output(payload, "stage7"))
+
+    def test_proposal_target_must_match_linked_finding_evidence(self):
+        base_payload = {
             "finding": [finding()],
             "correction_proposal": [
                 proposal(
                     proposal_id="P-stage7-R7.34-S01-SH001-001",
                     finding_id="F-stage7-R7.34-S01-SH001-001",
+                    states={},
+                )
+            ],
+            "metrics": valid_metrics("stage7"),
+        }
+        mutations = (
+            ("location", lambda item: item.__setitem__("location_id", "S99")),
+            (
+                "span",
+                lambda item: item.__setitem__(
+                    "source_span", {"start_line": 2, "end_line": 2}
+                ),
+            ),
+            (
+                "hash",
+                lambda item: item.__setitem__("expected_source_sha256", "1" * 64),
+            ),
+        )
+        for name, mutate in mutations:
+            with self.subTest(name=name):
+                payload = deepcopy(base_payload)
+                mutate(payload["correction_proposal"][0])
+                with self.assertRaisesRegex(
+                    policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+                ):
+                    policy.parse_stage_output(payload, "stage7")
+
+    def test_multi_finding_proposal_requires_one_coherent_target(self):
+        first = finding()
+        second = finding(
+            finding_id="F-stage7-R7.35-S01-SH002-002",
+            location_id="S01-SH002",
+            source_span={"start_line": 2, "end_line": 2},
+            source_text_sha256="1" * 64,
+            rule_id="R7.35",
+        )
+        combined = proposal(
+            proposal_id="P-stage7-R7.34-S01-SH001-001",
+            finding_id="F-stage7-R7.34-S01-SH001-001",
+            states={},
+        )
+        combined["finding_ids"] = [first["finding_id"], second["finding_id"]]
+        payload = {
+            "finding": [first, second],
+            "correction_proposal": [combined],
+            "metrics": valid_metrics("stage7"),
+        }
+        with self.assertRaisesRegex(
+            policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+        ):
+            policy.parse_stage_output(payload, "stage7")
+
+    def test_parse_then_apply_preserves_snapshot_error_precedence(self):
+        script = "original"
+        stale_payload = {
+            "finding": [finding(source_text_sha256="f" * 64)],
+            "correction_proposal": [
+                proposal(
+                    proposal_id="P-stage7-R7.34-S01-SH001-001",
+                    finding_id="F-stage7-R7.34-S01-SH001-001",
                     expected_hash="f" * 64,
-                    states={"prop": "blood"},
-                    writer_decision=False,
+                    states={
+                        "prop": {"category": "blood", "value": "blood_stained"}
+                    },
+                    writer_decision=True,
                 )
             ],
             "metrics": {
@@ -587,6 +964,9 @@ class WorkflowOrderTests(unittest.TestCase):
         valid_payload = deepcopy(stale_payload)
         valid_payload["correction_proposal"][0][
             "expected_source_sha256"
+        ] = policy.source_fragment_sha256(script, 1, 1)
+        valid_payload["finding"][0][
+            "source_text_sha256"
         ] = policy.source_fragment_sha256(script, 1, 1)
         parsed_valid = policy.parse_stage_output(valid_payload, "stage7")
         with self.assertRaisesRegex(
@@ -610,6 +990,16 @@ class WorkflowOrderTests(unittest.TestCase):
         self.assertIn("expected_source_sha256:", example)
         self.assertIn("地面上的断刀保持断裂状态。角色B从断刀旁跨过。", example)
         self.assertIn("corrected:", example)
+        self.assertIn('category: "condition"', example)
+        self.assertIn('value: "broken"', example)
+
+        handoff = (ROOT / "references/handoff-protocol.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("asset_state_changes", handoff)
+        self.assertIn("category", handoff)
+        self.assertIn("value", handoff)
+        self.assertIn("finding evidence", handoff)
 
     def test_security_policy_permits_only_the_three_output_components(self):
         security = (ROOT / "references/security-model.md").read_text(encoding="utf-8")

@@ -34,7 +34,14 @@
       "incompatible_asset_state"
     ],
     "stalePatchStatus": "BLOCKED: STALE_PATCH",
-    "writerDecisionContinuityStates": [
+    "assetStateChangeCategories": [
+      "condition",
+      "blood",
+      "displacement",
+      "occlusion",
+      "orientation"
+    ],
+    "writerDecisionStateCategories": [
       "blood",
       "displacement",
       "occlusion",
@@ -49,9 +56,11 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
+        "x-fieldOrder": ["start_line", "end_line"],
         "required": ["id", "start_line", "end_line"],
         "properties": {
-          "id": {"type": "string"},
+          "id": {"type": "string", "minLength": 1},
           "start_line": {"type": "integer", "minimum": 1},
           "end_line": {"type": "integer", "minimum": 1}
         }
@@ -61,12 +70,13 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["scene", "shots"],
         "properties": {
-          "scene": {"type": "string"},
+          "scene": {"type": "string", "minLength": 1},
           "shots": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {"type": "string", "minLength": 1},
             "minItems": 1
           }
         }
@@ -76,12 +86,13 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["location", "actor", "action", "affected_asset"],
         "properties": {
-          "location": {"type": "string"},
-          "actor": {"type": "string"},
-          "action": {"type": "string"},
-          "affected_asset": {"type": "string"}
+          "location": {"type": "string", "minLength": 1},
+          "actor": {"type": "string", "minLength": 1},
+          "action": {"type": "string", "minLength": 1},
+          "affected_asset": {"type": "string", "minLength": 1}
         }
       }
     },
@@ -114,6 +125,259 @@
           }
         }
       ]
+    }
+  },
+  "metricSchemas": {
+    "stage1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scene_count", "scene_boundaries", "character_count", "pronoun_density", "intent_word_count", "metaphor_count", "six_layer_coverage", "stage1_pass_rate"],
+      "properties": {
+        "scene_count": {"type": "integer", "minimum": 0},
+        "scene_boundaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "x-fieldOrder": ["start_line", "end_line"],
+            "required": ["id", "start_line", "end_line"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1},
+              "start_line": {"type": "integer", "minimum": 1},
+              "end_line": {"type": "integer", "minimum": 1}
+            }
+          }
+        },
+        "character_count": {"type": "integer", "minimum": 0},
+        "pronoun_density": {"type": "number", "minimum": 0, "maximum": 1},
+        "intent_word_count": {"type": "integer", "minimum": 0},
+        "metaphor_count": {"type": "integer", "minimum": 0},
+        "six_layer_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "stage1_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scene_boundaries", "anchor_count_per_scene", "initial_state_completeness", "consistency_score", "atmosphere_specificity", "stage2_pass_rate"],
+      "properties": {
+        "scene_boundaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "x-fieldOrder": ["start_line", "end_line"],
+            "required": ["id", "start_line", "end_line"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1},
+              "start_line": {"type": "integer", "minimum": 1},
+              "end_line": {"type": "integer", "minimum": 1}
+            }
+          }
+        },
+        "anchor_count_per_scene": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scene", "anchors", "names"],
+            "properties": {
+              "scene": {"type": "string", "minLength": 1},
+              "anchors": {"type": "integer", "minimum": 0},
+              "names": {"type": "array", "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        },
+        "initial_state_completeness": {"type": "number", "minimum": 0, "maximum": 1},
+        "consistency_score": {"type": "number", "minimum": 0, "maximum": 1},
+        "atmosphere_specificity": {"type": "number", "minimum": 0, "maximum": 1},
+        "stage2_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shot_count", "scene_shot_map", "avg_info_layers", "format_consistency", "risk_distribution", "dual_high_conflict_count", "stage3_pass_rate"],
+      "properties": {
+        "shot_count": {"type": "integer", "minimum": 0},
+        "scene_shot_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scene", "shots"],
+            "properties": {
+              "scene": {"type": "string", "minLength": 1},
+              "shots": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+            }
+          }
+        },
+        "avg_info_layers": {"type": "number", "minimum": 0, "maximum": 6},
+        "format_consistency": {"type": "number", "minimum": 0, "maximum": 1},
+        "risk_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "medium", "high"],
+          "properties": {
+            "low": {"type": "integer", "minimum": 0},
+            "medium": {"type": "integer", "minimum": 0},
+            "high": {"type": "integer", "minimum": 0}
+          }
+        },
+        "dual_high_conflict_count": {"type": "integer", "minimum": 0},
+        "stage3_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key_action_events", "action_complexity", "emotion_leakage_count", "missing_physics_feedback", "action_chain_issues", "overloaded_shots", "interaction_risk_count", "stage4_pass_rate"],
+      "properties": {
+        "key_action_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["location", "actor", "action", "affected_asset"],
+            "properties": {
+              "location": {"type": "string", "minLength": 1},
+              "actor": {"type": "string", "minLength": 1},
+              "action": {"type": "string", "minLength": 1},
+              "affected_asset": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "action_complexity": {"type": "number", "minimum": 1, "maximum": 10},
+        "emotion_leakage_count": {"type": "integer", "minimum": 0},
+        "missing_physics_feedback": {"type": "integer", "minimum": 0},
+        "action_chain_issues": {"type": "integer", "minimum": 0},
+        "overloaded_shots": {"type": "integer", "minimum": 0},
+        "interaction_risk_count": {"type": "integer", "minimum": 0},
+        "stage4_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage4_5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tracked_asset_count", "continuity_risk_count", "high_risk_asset_jumps", "requires_writer_confirmation_count", "suggested_visual_anchor_updates", "low_risk_patch_count", "stage4_5_pass_rate"],
+      "properties": {
+        "tracked_asset_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["character", "scene", "prop"],
+          "properties": {
+            "character": {"type": "integer", "minimum": 0},
+            "scene": {"type": "integer", "minimum": 0},
+            "prop": {"type": "integer", "minimum": 0}
+          }
+        },
+        "continuity_risk_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["high", "medium", "low"],
+          "properties": {
+            "high": {"type": "integer", "minimum": 0},
+            "medium": {"type": "integer", "minimum": 0},
+            "low": {"type": "integer", "minimum": 0}
+          }
+        },
+        "high_risk_asset_jumps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["asset", "from", "to"],
+            "properties": {
+              "asset": {"type": "string", "minLength": 1},
+              "from": {"type": "string", "minLength": 1},
+              "to": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "requires_writer_confirmation_count": {"type": "integer", "minimum": 0},
+        "suggested_visual_anchor_updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["asset", "location", "reason"],
+            "properties": {
+              "asset": {"type": "string", "minLength": 1},
+              "location": {"type": "string", "minLength": 1},
+              "reason": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "low_risk_patch_count": {"type": "integer", "minimum": 0},
+        "stage4_5_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_profile_declared", "generation_risk_score", "anchor_coverage", "visual_nail_count", "negative_constraint_coverage", "high_risk_shots", "failure_mode_distribution", "stage5_pass_rate"],
+      "properties": {
+        "target_profile_declared": {"type": "boolean"},
+        "generation_risk_score": {"type": "number", "minimum": 1, "maximum": 10},
+        "anchor_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "visual_nail_count": {"type": "integer", "minimum": 0},
+        "negative_constraint_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "high_risk_shots": {"type": "integer", "minimum": 0},
+        "failure_mode_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["face_swap", "limb_error", "prop_vanish", "lr_drift", "bg_jump", "action_break", "occlusion"],
+          "properties": {
+            "face_swap": {"type": "integer", "minimum": 0},
+            "limb_error": {"type": "integer", "minimum": 0},
+            "prop_vanish": {"type": "integer", "minimum": 0},
+            "lr_drift": {"type": "integer", "minimum": 0},
+            "bg_jump": {"type": "integer", "minimum": 0},
+            "action_break": {"type": "integer", "minimum": 0},
+            "occlusion": {"type": "integer", "minimum": 0}
+          }
+        },
+        "stage5_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isolation_compliance", "ai_taste_score", "dialogue_mismatch_count", "natural_speech_score", "stage6_pass_rate"],
+      "properties": {
+        "isolation_compliance": {"type": "number", "minimum": 0, "maximum": 1},
+        "ai_taste_score": {"type": "number", "minimum": 1, "maximum": 10},
+        "dialogue_mismatch_count": {"type": "integer", "minimum": 0},
+        "natural_speech_score": {"type": "number", "minimum": 0, "maximum": 1},
+        "stage6_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "stage7": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team_handoff_score", "acceptance_readiness", "stage7_pass_rate"],
+      "properties": {
+        "team_handoff_score": {
+          "oneOf": [
+            {"type": "number", "minimum": 0, "maximum": 1},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["director", "storyboard", "art", "animation", "ai_generation", "continuity_handoff"],
+              "properties": {
+                "director": {"type": "number", "minimum": 0, "maximum": 1},
+                "storyboard": {"type": "number", "minimum": 0, "maximum": 1},
+                "art": {"type": "number", "minimum": 0, "maximum": 1},
+                "animation": {"type": "number", "minimum": 0, "maximum": 1},
+                "ai_generation": {"type": "number", "minimum": 0, "maximum": 1},
+                "continuity_handoff": {"type": "number", "minimum": 0, "maximum": 1}
+              }
+            }
+          ]
+        },
+        "acceptance_readiness": {"type": "number", "minimum": 0, "maximum": 1},
+        "stage7_pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
     }
   },
   "stages": {

@@ -131,7 +131,8 @@ correction_proposal:
   expected_source_sha256: "4e552328c74ae5e1a6cdf85a1eb0d77ca1ee327e9bbcabfde67a647c407633c2"
   replacement: "地面上的断刀保持断裂状态。角色B从断刀旁跨过。"
   affected_assets: ["断刀"]
-  asset_state_changes: {"断刀": "confirmed_broken"}
+  asset_state_changes:
+    "断刀": {category: "condition", value: "broken"}
   requires_writer_decision: false
 ```
 
@@ -180,24 +181,22 @@ continuity_item:
 
 ## Metrics 输出
 
-```yaml
-stage4_5_metrics:
-  tracked_asset_count:
-    character: N
-    scene: N
-    prop: N
-  continuity_risk_count:
-    high: N
-    medium: N
-    low: N
-  high_risk_asset_jumps:
-    - {asset: "资产名", from: "SCENE/镜头", to: "SCENE/镜头"}
-  requires_writer_confirmation_count: N
-  suggested_visual_anchor_updates:
-    - {asset: "资产名", location: "SCENE/镜头", reason: "为什么应作为锚点或负向约束"}
-  low_risk_patch_count: N
-  pass_rate: 0.XX
+<!-- canonical-metrics:stage4_5 -->
+```json
+{
+  "tracked_asset_count": {"character": 2, "scene": 1, "prop": 1},
+  "continuity_risk_count": {"high": 0, "medium": 0, "low": 1},
+  "high_risk_asset_jumps": [],
+  "requires_writer_confirmation_count": 0,
+  "suggested_visual_anchor_updates": [
+    {"asset": "门", "location": "S01-SH01", "reason": "保持连续性锚点"}
+  ],
+  "low_risk_patch_count": 1,
+  "stage4_5_pass_rate": 1.0
+}
 ```
+
+Findings 只存在于独立的 `finding` 组件，不在 metrics 中重复计数。
 
 ## 下游handoff
 
@@ -206,8 +205,6 @@ to_stage5:
   continuity_risk_count: {high: N, medium: N, low: N}
   suggested_visual_anchor_updates: [{asset, location, reason}]
 to_stage7:
-  continuity_risk_high: N
-  continuity_risk_total: N
   requires_writer_confirmation_count: N
 ```
 

@@ -240,23 +240,26 @@ AI不只需要"该生成什么"，也需要"绝对不要生成什么"。（如�
 
 ## Metrics 输出
 
-```yaml
-stage5_metrics:
-  target_profile_declared: true    # 必需布尔值；仅非 null 且 schema 有效时为 true
-  generation_risk_score: N.N      # 整体生成风险评分(1-10)
-  anchor_coverage: 0.XX           # 角色锚点覆盖率
-  visual_nail_count: N            # 视觉钉子数量
-  negative_constraint_coverage: 0.XX  # 负向约束覆盖率
-  high_risk_shots: N              # 高风险镜头数
-  failure_mode_distribution:
-    face_swap: N
-    limb_error: N
-    prop_vanish: N
-    lr_drift: N
-    bg_jump: N
-    action_break: N
-    occlusion: N
-  stage5_pass_rate: 0.XX
+<!-- canonical-metrics:stage5 -->
+```json
+{
+  "target_profile_declared": true,
+  "generation_risk_score": 2.0,
+  "anchor_coverage": 1.0,
+  "visual_nail_count": 1,
+  "negative_constraint_coverage": 1.0,
+  "high_risk_shots": 0,
+  "failure_mode_distribution": {
+    "face_swap": 0,
+    "limb_error": 0,
+    "prop_vanish": 0,
+    "lr_drift": 0,
+    "bg_jump": 0,
+    "action_break": 0,
+    "occlusion": 0
+  },
+  "stage5_pass_rate": 1.0
+}
 ```
 
-Findings 必须保留在独立的 `finding` 组件中，不得作为 `metrics.findings_count` 混入 Stage 5 metrics。Orchestrator 按 `parse_stage_output(payload, stage_id, prerequisites=None)` 把已验证的 prerequisite 作为第三个参数传入；只有 reviewer 的 `target_profile_declared` 与 parser 从 `target_profile` 推导出的布尔值一致时，该值才可用于硬门槛，reviewer 不得自行断言。
+Findings 必须保留在独立的 `finding` 组件中，不得在 Stage 5 metrics 内另设 findings 计数键。Orchestrator 按 `parse_stage_output(payload, stage_id, prerequisites=None)` 把已验证的 prerequisite 作为第三个参数传入；只有 reviewer 的 `target_profile_declared` 与 parser 从 `target_profile` 推导出的布尔值一致时，该值才可用于硬门槛，reviewer 不得自行断言。
