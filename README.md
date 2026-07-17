@@ -20,7 +20,7 @@
 1. `standardized-script`
    基于 [`assets/template-standard-format.md`](assets/template-standard-format.md) 生成的标准剧本文档，不混入评分、批注、诊断说明或过程性注释。
 2. `diagnostics-record`
-   高细粒度诊断记录，至少包含运行范围、总分与评级、各 Stage 摘要、逐条问题、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审 12 问结果和复查建议。
+   高细粒度诊断记录，至少包含运行范围、总分与交付状态、各 Stage 摘要、逐条问题、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审 12 问结果和复查建议。
 3. `asset-continuity-ledger`
    面向编剧的角色、场景、道具连续性状态账本，用于提示隐含状态变化、跳跃式再出现风险、编剧待确认项和多方案补写建议。
 

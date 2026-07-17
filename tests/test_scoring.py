@@ -36,6 +36,7 @@ class ScoringTests(unittest.TestCase):
     def test_ready_requires_ninety_and_all_gates(self):
         self.assertEqual("READY", classify_delivery(self.contract, 90.0, self.gates))
         self.assertEqual("CONDITIONAL", classify_delivery(self.contract, 89.9, self.gates))
+        self.assertEqual("CONDITIONAL", classify_delivery(self.contract, 70.0, self.gates))
         self.assertEqual("REWORK", classify_delivery(self.contract, 69.9, self.gates))
 
     def test_invalid_counts_raise(self):
