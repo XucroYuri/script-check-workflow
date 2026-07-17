@@ -35,6 +35,34 @@
           "end_line": {"type": "integer", "minimum": 1}
         }
       }
+    },
+    "scene_shot_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scene", "shots"],
+        "properties": {
+          "scene": {"type": "string"},
+          "shots": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "key_action_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["location", "actor", "action", "affected_asset"],
+        "properties": {
+          "location": {"type": "string"},
+          "actor": {"type": "string"},
+          "action": {"type": "string"},
+          "affected_asset": {"type": "string"}
+        }
+      }
     }
   },
   "stages": {

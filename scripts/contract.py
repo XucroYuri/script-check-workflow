@@ -59,6 +59,73 @@ SCENE_BOUNDARIES_SCHEMA = {
         },
     },
 }
+SCENE_SHOT_MAP_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": ["scene", "shots"],
+        "properties": {
+            "scene": {"type": "string"},
+            "shots": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+            },
+        },
+    },
+}
+KEY_ACTION_EVENTS_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": ["location", "actor", "action", "affected_asset"],
+        "properties": {
+            "location": {"type": "string"},
+            "actor": {"type": "string"},
+            "action": {"type": "string"},
+            "affected_asset": {"type": "string"},
+        },
+    },
+}
+FIELD_SCHEMAS = {
+    "scene_boundaries": SCENE_BOUNDARIES_SCHEMA,
+    "scene_shot_map": SCENE_SHOT_MAP_SCHEMA,
+    "key_action_events": KEY_ACTION_EVENTS_SCHEMA,
+}
+STAGE_FIELDS = {
+    "stage1": {
+        "requires": ["script_text", "run_metadata"],
+        "produces": ["scene_count", "scene_boundaries", "character_count", "pronoun_density", "intent_word_count", "metaphor_count", "six_layer_coverage", "stage1_findings", "stage1_pass_rate"],
+    },
+    "stage2": {
+        "requires": ["script_text", "scene_count", "scene_boundaries"],
+        "produces": ["scene_boundaries", "anchor_count_per_scene", "initial_state_completeness", "consistency_score", "atmosphere_specificity", "stage2_findings", "stage2_pass_rate"],
+    },
+    "stage3": {
+        "requires": ["script_text", "scene_boundaries", "anchor_count_per_scene"],
+        "produces": ["shot_count", "scene_shot_map", "avg_info_layers", "format_consistency", "risk_distribution", "dual_high_conflict_count", "stage3_findings", "stage3_pass_rate"],
+    },
+    "stage4": {
+        "requires": ["script_text", "shot_count", "risk_distribution"],
+        "produces": ["key_action_events", "action_complexity", "emotion_leakage_count", "missing_physics_feedback", "action_chain_issues", "overloaded_shots", "interaction_risk_count", "stage4_findings", "stage4_pass_rate"],
+    },
+    "stage4_5": {
+        "requires": ["script_text", "scene_boundaries", "anchor_count_per_scene", "shot_count", "scene_shot_map", "key_action_events", "interaction_risk_count"],
+        "produces": ["tracked_asset_count", "continuity_risk_count", "high_risk_asset_jumps", "requires_writer_confirmation_count", "suggested_visual_anchor_updates", "low_risk_patch_count", "stage4_5_findings", "stage4_5_pass_rate"],
+    },
+    "stage5": {
+        "requires": ["script_text", "target_profile", "action_complexity", "interaction_risk_count", "continuity_risk_count", "suggested_visual_anchor_updates", "shot_count"],
+        "produces": ["generation_risk_score", "anchor_coverage", "visual_nail_count", "negative_constraint_coverage", "high_risk_shots", "failure_mode_distribution", "stage5_findings", "stage5_pass_rate"],
+    },
+    "stage6": {
+        "requires": ["script_text", "character_count", "scene_count"],
+        "produces": ["isolation_compliance", "ai_taste_score", "dialogue_mismatch_count", "natural_speech_score", "stage6_findings", "stage6_pass_rate"],
+    },
+    "stage7": {
+        "requires": ["script_text", "scene_count", "shot_count", "requires_writer_confirmation_count", "stage1_pass_rate", "stage2_pass_rate", "stage3_pass_rate", "stage4_pass_rate", "stage4_5_pass_rate", "stage5_pass_rate", "stage6_pass_rate"],
+        "produces": ["team_handoff_score", "acceptance_readiness", "stage7_findings", "stage7_pass_rate"],
+    },
+}
 REQUIRED_ROOT_KEYS = {
     "contractVersion",
     "stageOrder",
@@ -68,10 +135,16 @@ REQUIRED_ROOT_KEYS = {
     "stages",
     "scoring",
 }
+CANONICAL_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[1] / "contracts" / "workflow-contract.json"
+)
 
 
 def load_contract(path: PathLike) -> Dict[str, Any]:
-    with Path(path).open("r", encoding="utf-8") as handle:
+    requested_path = Path(path).resolve()
+    if requested_path != CANONICAL_CONTRACT_PATH:
+        raise ValueError("load_contract only accepts the canonical workflow contract path")
+    with requested_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
@@ -107,8 +180,10 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
     field_schemas = contract.get("fieldSchemas")
     if not isinstance(field_schemas, dict):
         errors.append("fieldSchemas must be an object")
-    elif field_schemas.get("scene_boundaries") != SCENE_BOUNDARIES_SCHEMA:
-        errors.append("scene_boundaries must use the canonical field schema")
+    else:
+        for field_name, schema in FIELD_SCHEMAS.items():
+            if field_schemas.get(field_name) != schema:
+                errors.append(field_name + " must use the canonical field schema")
 
     stages = contract.get("stages")
     valid_stages = isinstance(stages, dict)
@@ -133,6 +208,11 @@ def validate_contract(contract: Dict[str, Any]) -> List[str]:
             if not _is_list_of_strings(produces):
                 errors.append(stage_id + " produces must be a list of strings")
                 produces = []
+            expected = STAGE_FIELDS[stage_id]
+            if set(requires) != set(expected["requires"]) or len(requires) != len(expected["requires"]):
+                errors.append(stage_id + " requires must contain the exact canonical field set")
+            if set(produces) != set(expected["produces"]) or len(produces) != len(expected["produces"]):
+                errors.append(stage_id + " produces must contain the exact canonical field set")
             missing = sorted(set(requires) - available)
             if missing:
                 errors.append(

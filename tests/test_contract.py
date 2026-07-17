@@ -38,6 +38,16 @@ class WorkflowContractTests(unittest.TestCase):
             ["id", "start_line", "end_line"], schema["items"]["required"]
         )
 
+    def test_contract_declares_continuity_handoff_schemas(self):
+        schemas = self.contract["fieldSchemas"]
+        self.assertEqual(
+            ["scene", "shots"], schemas["scene_shot_map"]["items"]["required"]
+        )
+        self.assertEqual(
+            ["location", "actor", "action", "affected_asset"],
+            schemas["key_action_events"]["items"]["required"],
+        )
+
     def test_contract_declares_full_run_unicode_code_point_limit(self):
         self.assertEqual(
             60000, self.contract["inputBudget"]["maxScriptUnicodeCodePoints"]
@@ -49,6 +59,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn(
             "missing required root key: stages", validate_contract(contract)
         )
+
+    def test_noncanonical_contract_path_is_rejected_before_read(self):
+        with self.assertRaisesRegex(ValueError, "canonical workflow contract"):
+            load_contract(ROOT / "tests" / "untrusted-contract.json")
 
     def test_non_list_stage_requires_is_invalid(self):
         contract = deepcopy(self.contract)
@@ -64,11 +78,45 @@ class WorkflowContractTests(unittest.TestCase):
             "stage2 produces must be a list of strings", validate_contract(contract)
         )
 
+    def test_deleted_stage_prerequisite_is_invalid(self):
+        contract = deepcopy(self.contract)
+        contract["stages"]["stage3"]["requires"].remove("scene_boundaries")
+        self.assertIn(
+            "stage3 requires must contain the exact canonical field set",
+            validate_contract(contract),
+        )
+
+    def test_deleted_stage_output_is_invalid(self):
+        contract = deepcopy(self.contract)
+        contract["stages"]["stage7"]["produces"].remove("acceptance_readiness")
+        self.assertIn(
+            "stage7 produces must contain the exact canonical field set",
+            validate_contract(contract),
+        )
+
     def test_wrong_unicode_code_point_limit_is_invalid(self):
         contract = deepcopy(self.contract)
         contract["inputBudget"]["maxScriptUnicodeCodePoints"] = 59999
         self.assertIn(
             "inputBudget.maxScriptUnicodeCodePoints must equal 60000",
+            validate_contract(contract),
+        )
+
+    def test_mutated_continuity_field_schema_is_invalid(self):
+        contract = deepcopy(self.contract)
+        contract["fieldSchemas"]["scene_shot_map"]["items"]["properties"][
+            "shots"
+        ]["type"] = "integer"
+        self.assertIn(
+            "scene_shot_map must use the canonical field schema",
+            validate_contract(contract),
+        )
+
+    def test_mutated_action_event_schema_is_invalid(self):
+        contract = deepcopy(self.contract)
+        contract["fieldSchemas"]["key_action_events"]["items"]["required"].pop()
+        self.assertIn(
+            "key_action_events must use the canonical field schema",
             validate_contract(contract),
         )
 
