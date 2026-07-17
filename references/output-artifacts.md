@@ -14,9 +14,9 @@
 
 ## 产物总览
 
-`AI可执行剧本检查表V3` 的默认产物是三份 Markdown 文档。剧本文档名称由硬门槛结果决定：
+`AI可执行剧本检查表V3.2` 的默认产物是三份 Markdown 文档。剧本文档名称由交付状态决定：
 
-1. `standardized-script`（仅 `READY` / `CONDITIONAL`）或 `candidate-script`（`BLOCKED`）
+1. `standardized-script`（仅 `READY` / `CONDITIONAL`）或 `candidate-script`（`REWORK` / `BLOCKED`）
 2. `diagnostics-record`
 3. `asset-continuity-ledger`
 
@@ -55,13 +55,13 @@
 
 每次文件模式运行生成 UTC run ID：`YYYYMMDDTHHMMSSZ`。
 
-通过全部硬门槛：
+交付状态为 `READY` 或 `CONDITIONAL`：
 
 - `<stem>.<run-id>.standardized-script.md`
 - `<stem>.<run-id>.diagnostics.md`
 - `<stem>.<run-id>.asset-continuity-ledger.md`
 
-未通过硬门槛：
+交付状态为 `REWORK` 或 `BLOCKED`：
 
 - `<stem>.<run-id>.candidate-script.md`
 - `<stem>.<run-id>.diagnostics.md`
@@ -71,14 +71,14 @@
 
 ## 安全发布事务
 
-完整安全规则以 [security-model.md](security-model.md) 为准。发布前必须对三个最终目标做同一次预检，写入并验证三个同目录临时文件。三个重命名操作不是一个原子事务：通过硬门槛时按“diagnostics → asset-continuity-ledger → standardized-script 最后”的顺序发布；候选交付时按“diagnostics → asset-continuity-ledger → candidate-script 最后”的顺序发布。
+完整安全规则以 [security-model.md](security-model.md) 为准。发布前必须对三个最终目标做同一次预检，写入并验证三个同目录临时文件。三个重命名操作不是一个原子事务：`READY` / `CONDITIONAL` 时按“diagnostics → asset-continuity-ledger → standardized-script 最后”的顺序发布；`REWORK` / `BLOCKED` 时按“diagnostics → asset-continuity-ledger → candidate-script 最后”的顺序发布。
 
 任一 rename/no-replace 失败时，删除本次已发布的文件和全部临时文件，并返回 `BLOCKED: OUTPUT_COMMIT_FAILED`；不得覆盖既有文件，也不得留下看似完整的标准稿或候选稿。
 
 ## standardized-script 结构
 
 `standardized-script` 是干净终稿，不是 diff，不是批注稿，不是报告。
-只有候选稿通过全部硬门槛并获得 `READY` 或 `CONDITIONAL` 状态后，才可晋升并命名为 `standardized-script`。`BLOCKED` 时必须保留 `candidate-script` 名称，且不得输出任何名为 `standardized-script` 的产物。
+只有候选稿获得 `READY` 或 `CONDITIONAL` 状态后，才可晋升并命名为 `standardized-script`。`REWORK` 或 `BLOCKED` 时必须保留 `candidate-script` 名称，且不得输出任何名为 `standardized-script` 的产物。
 
 ### 必须包含
 
@@ -267,21 +267,22 @@ diagnostics 必须同时包含 `original_baseline` 和 `candidate_final`，但�
 
 ### 全量检查
 
-- `standardized-script` 必须是完整标准稿
+- `READY` / `CONDITIONAL` 的 `standardized-script` 必须是完整标准稿
+- `REWORK` / `BLOCKED` 的剧本文档必须保持 `candidate-script` 名称
 - `diagnostics-record` 覆盖全剧
 - `asset-continuity-ledger` 覆盖全剧关键角色、场景、道具连续性状态
 
 ### 定向 Stage 检查
 
 - `diagnostics-record` 只写该 Stage 结果
-- `standardized-script` 只重写该 Stage 直接影响到的用户指定范围
+- 剧本文档只重写该 Stage 直接影响到的用户指定范围，并按交付状态命名为 `standardized-script` 或 `candidate-script`
 - `asset-continuity-ledger` 只覆盖该 Stage 或用户指定范围内可安全判断的连续性问题
 - 文首必须标注“范围限定稿”
 
 ### 单镜检查
 
 - `diagnostics-record` 只覆盖该镜或该片段
-- `standardized-script` 只输出该镜或该片段的标准化版本
+- 剧本文档只输出该镜或该片段的标准化版本，并按交付状态命名为 `standardized-script` 或 `candidate-script`
 - `asset-continuity-ledger` 只输出该镜或该片段涉及的资产连续性提示，不得补写未检查区域
 - 不得补写未检查区域
 

@@ -84,6 +84,36 @@
           "affected_asset": {"type": "string"}
         }
       }
+    },
+    "target_profile": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "model",
+            "model_version",
+            "mode",
+            "clip_duration_seconds",
+            "aspect_ratio",
+            "reference_assets_available"
+          ],
+          "properties": {
+            "provider": {"type": "string", "minLength": 1},
+            "model": {"type": "string", "minLength": 1},
+            "model_version": {"type": "string", "minLength": 1},
+            "mode": {
+              "enum": ["T2V", "I2V", "keyframe-animation", "segmented-generation"]
+            },
+            "clip_duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+            "aspect_ratio": {"type": "string", "pattern": "^[1-9][0-9]*:[1-9][0-9]*$"},
+            "reference_assets_available": {"type": "boolean"}
+          }
+        }
+      ]
     }
   },
   "stages": {
@@ -172,6 +202,7 @@
         "shot_count"
       ],
       "produces": [
+        "target_profile_declared",
         "generation_risk_score",
         "anchor_coverage",
         "visual_nail_count",

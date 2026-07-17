@@ -60,4 +60,4 @@
 | 任一硬门槛失败 | `BLOCKED` | 不得输出 standardized-script |
 | 门槛全过且 90.0–100.0 | `READY` | 可进入下一制作环节，仍需按项目验收流程执行 |
 | 门槛全过且 70.0–89.9 | `CONDITIONAL` | 允许交付，但必须按 diagnostics 继续优化 |
-| 门槛全过且 0.0–69.9 | `REWORK` | 候选稿需要重做，不进入生产 |
+| 门槛全过且 0.0–69.9 | `REWORK` | 保留 `candidate-script` 名称；候选稿需要重做，不进入生产 |

@@ -20,7 +20,7 @@
 当输入的是剧本而不是规则咨询时，默认输出三份 Markdown 文档：
 
 1. `standardized-script` 或 `candidate-script`
-   通过全部硬门槛并获得 `READY` / `CONDITIONAL` 时，基于 [`assets/template-standard-format.md`](assets/template-standard-format.md) 生成 `standardized-script`；`BLOCKED` 时保留 `candidate-script` 名称。剧本文档不混入评分、批注、诊断说明或过程性注释。
+   获得 `READY` / `CONDITIONAL` 时，基于 [`assets/template-standard-format.md`](assets/template-standard-format.md) 生成 `standardized-script`；`REWORK` / `BLOCKED` 时保留 `candidate-script` 名称。剧本文档不混入评分、批注、诊断说明或过程性注释。
 2. `diagnostics-record`
    高细粒度诊断记录，至少包含运行范围、总分与交付状态、各 Stage 摘要、逐条问题、规则依据、修改策略、修改前后对照、优先级排序、冲突裁决、终审 12 问结果和复查建议。
 3. `asset-continuity-ledger`
@@ -34,7 +34,7 @@
 |------|------|
 | `READY` | 全部硬门槛通过且候选稿得分至少 90.0，可进入下一制作环节，仍需按项目流程最终验收 |
 | `CONDITIONAL` | 全部硬门槛通过且候选稿得分为 70.0–89.9，允许交付，但必须按 diagnostics 继续优化 |
-| `REWORK` | 全部硬门槛通过但候选稿得分低于 70.0，需要重做，不进入生产 |
+| `REWORK` | 全部硬门槛通过但候选稿得分低于 70.0，保留 `candidate-script` 名称，需要重做且不进入生产 |
 | `BLOCKED` | 至少一项硬门槛失败，或契约、安全、写入证据不完整；无论分数多高都不得输出 `standardized-script` |
 
 ## 核心约束

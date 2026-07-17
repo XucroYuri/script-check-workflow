@@ -21,7 +21,9 @@
 
 ## 目标生成配置
 
-Stage 5 接收的 `target_profile` 必须满足以下 schema：
+Orchestrator 必须始终向 Stage 5 提供 `target_profile` 字段。用户未声明目标模型或生成模式时，字段值固定为 JSON `null`，不得使用空对象、`unknown` 字符串或其他占位对象。字段缺失时返回 `BLOCKED: CONTRACT_ERROR`。
+
+`target_profile` 的机器字段 schema 允许 `null` 或满足以下精确七字段 schema 的对象：
 
 ```json
 {
@@ -51,9 +53,9 @@ Stage 5 接收的 `target_profile` 必须满足以下 schema：
 }
 ```
 
-如果用户没有提供目标模型和生成模式，Stage 5 可以输出通用风险建议，但 `target_profile_declared` 必须为 false，最终状态不得是 READY。不得把单一模型经验写成所有模型的永久能力边界。
+如果用户没有提供目标模型和生成模式，Stage 5 接收 `target_profile: null`，可以输出通用风险建议，但 `target_profile_declared` 必须为 false，最终状态不得是 READY。不得把单一模型经验写成所有模型的永久能力边界。
 
-`target_profile_declared` 是失败关闭硬门槛；值为 false 时最终状态必须为 `BLOCKED`，不得进入生产。
+`target_profile_declared` 是失败关闭硬门槛：`target_profile` 非 null 且通过 schema 验证时为 true，null 或无效时为 false。值为 false 时最终状态必须为 `BLOCKED`，不得进入生产。无效的非 null 对象必须立即返回 `BLOCKED: CONTRACT_ERROR`，不得静默改成 null 或继续作为通用建议运行。
 
 ## 上游prerequisite
 
@@ -240,7 +242,7 @@ AI不只需要"该生成什么"，也需要"绝对不要生成什么"。（如�
 
 ```yaml
 stage5_metrics:
-  target_profile_declared: true    # target_profile 通过 schema 验证时为 true，否则为 false
+  target_profile_declared: true    # 必需布尔值；仅非 null 且 schema 有效时为 true
   generation_risk_score: N.N      # 整体生成风险评分(1-10)
   anchor_coverage: 0.XX           # 角色锚点覆盖率
   visual_nail_count: N            # 视觉钉子数量

@@ -6,6 +6,8 @@
 
 任一 `requires` 字段缺失时，orchestrator 必须停止当前运行并输出 `BLOCKED: CONTRACT_ERROR`。不得由下游 Stage 猜测、重算或静默补造缺失字段。
 
+`target_profile` 是始终存在的 orchestrator 输入字段。用户未声明目标模型或生成模式时，其规范值是 JSON `null`，不得使用占位对象。非 null 值必须通过 `fieldSchemas.target_profile`；无效值返回 `BLOCKED: CONTRACT_ERROR`，不得静默降级为 null。
+
 本文件定义Stage之间的信息传递规范，确保上下文隔离的同时支撑必要的跨层依赖。
 
 ---
@@ -123,6 +125,29 @@ stage4_5_metrics:
   pass_rate: 0.75
 ```
 
+### Stage 5 Metrics 输出Schema
+
+```yaml
+stage5_metrics:
+  target_profile_declared: true
+  generation_risk_score: 2.0
+  anchor_coverage: 0.95
+  visual_nail_count: 4
+  negative_constraint_coverage: 0.90
+  high_risk_shots: 1
+  failure_mode_distribution:
+    face_swap: 0
+    limb_error: 1
+    prop_vanish: 0
+    lr_drift: 0
+    bg_jump: 0
+    action_break: 0
+    occlusion: 0
+  pass_rate: 0.92
+```
+
+`target_profile_declared` 必须是布尔值。其值仅在 `target_profile` 非 null 且通过 schema 验证时为 true；null 或无效时为 false。无效的非 null 输入同时触发 `BLOCKED: CONTRACT_ERROR`，因此不得进入 Stage reviewer 或被静默当作 null。
+
 ---
 
 ## Prerequisite Contract（各Stage上游依赖）
@@ -184,6 +209,16 @@ prerequisite:
 ### Stage 5: AI生成适配检查
 ```yaml
 prerequisite:
+  from_orchestrator:
+    target_profile:               # 字段必需；未声明时必须是 JSON null
+      provider: "OpenAI"
+      model: "Sora"
+      model_version: "2026-07"
+      mode: "T2V"
+      clip_duration_seconds: 8
+      aspect_ratio: "16:9"
+      reference_assets_available: false
+    # 若用户未声明，以上 target_profile 映射必须整体替换为：target_profile: null
   from_stage4:
     action_complexity: 6.2
     interaction_risk_count: 5

@@ -54,6 +54,42 @@ class WorkflowContractTests(unittest.TestCase):
             60000, self.contract["inputBudget"]["maxScriptUnicodeCodePoints"]
         )
 
+    def test_contract_declares_nullable_exact_target_profile_schema(self):
+        schema = self.contract["fieldSchemas"].get("target_profile")
+        self.assertIsNotNone(schema, "target_profile needs a machine field schema")
+        null_schema, object_schema = schema["oneOf"]
+        self.assertEqual({"type": "null"}, null_schema)
+        self.assertEqual("object", object_schema["type"])
+        self.assertFalse(object_schema["additionalProperties"])
+        expected_fields = {
+            "provider",
+            "model",
+            "model_version",
+            "mode",
+            "clip_duration_seconds",
+            "aspect_ratio",
+            "reference_assets_available",
+        }
+        self.assertEqual(expected_fields, set(object_schema["required"]))
+        self.assertEqual(expected_fields, set(object_schema["properties"]))
+
+    def test_stage5_produces_exact_set_including_target_profile_gate(self):
+        produces = self.contract["stages"]["stage5"]["produces"]
+        self.assertEqual(
+            [
+                "target_profile_declared",
+                "generation_risk_score",
+                "anchor_coverage",
+                "visual_nail_count",
+                "negative_constraint_coverage",
+                "high_risk_shots",
+                "failure_mode_distribution",
+                "stage5_findings",
+                "stage5_pass_rate",
+            ],
+            produces,
+        )
+
     def test_missing_required_root_key_is_invalid(self):
         contract = deepcopy(self.contract)
         del contract["stages"]
@@ -118,6 +154,16 @@ class WorkflowContractTests(unittest.TestCase):
         contract["fieldSchemas"]["key_action_events"]["items"]["required"].pop()
         self.assertIn(
             "key_action_events must use the canonical field schema",
+            validate_contract(contract),
+        )
+
+    def test_mutated_target_profile_schema_is_invalid(self):
+        contract = deepcopy(self.contract)
+        schema = contract["fieldSchemas"].get("target_profile")
+        self.assertIsNotNone(schema, "target_profile needs a machine field schema")
+        schema["oneOf"][1]["additionalProperties"] = True
+        self.assertIn(
+            "target_profile must use the canonical field schema",
             validate_contract(contract),
         )
 

@@ -108,10 +108,45 @@ KEY_ACTION_EVENTS_SCHEMA = {
         },
     },
 }
+TARGET_PROFILE_OBJECT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "provider",
+        "model",
+        "model_version",
+        "mode",
+        "clip_duration_seconds",
+        "aspect_ratio",
+        "reference_assets_available",
+    ],
+    "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "model_version": {"type": "string", "minLength": 1},
+        "mode": {
+            "enum": ["T2V", "I2V", "keyframe-animation", "segmented-generation"]
+        },
+        "clip_duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "aspect_ratio": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*:[1-9][0-9]*$",
+        },
+        "reference_assets_available": {"type": "boolean"},
+    },
+}
+TARGET_PROFILE_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+        {"type": "null"},
+        TARGET_PROFILE_OBJECT_SCHEMA,
+    ],
+}
 FIELD_SCHEMAS = {
     "scene_boundaries": SCENE_BOUNDARIES_SCHEMA,
     "scene_shot_map": SCENE_SHOT_MAP_SCHEMA,
     "key_action_events": KEY_ACTION_EVENTS_SCHEMA,
+    "target_profile": TARGET_PROFILE_SCHEMA,
 }
 STAGE_FIELDS = {
     "stage1": {
@@ -136,7 +171,7 @@ STAGE_FIELDS = {
     },
     "stage5": {
         "requires": ["script_text", "target_profile", "action_complexity", "interaction_risk_count", "continuity_risk_count", "suggested_visual_anchor_updates", "shot_count"],
-        "produces": ["generation_risk_score", "anchor_coverage", "visual_nail_count", "negative_constraint_coverage", "high_risk_shots", "failure_mode_distribution", "stage5_findings", "stage5_pass_rate"],
+        "produces": ["target_profile_declared", "generation_risk_score", "anchor_coverage", "visual_nail_count", "negative_constraint_coverage", "high_risk_shots", "failure_mode_distribution", "stage5_findings", "stage5_pass_rate"],
     },
     "stage6": {
         "requires": ["script_text", "character_count", "scene_count"],

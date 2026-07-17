@@ -5,7 +5,12 @@ from hashlib import sha256
 import re
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
-from scripts.contract import CORRECTION_POLICY, REVIEWER_OUTPUT, STAGE_FIELDS
+from scripts.contract import (
+    CORRECTION_POLICY,
+    REVIEWER_OUTPUT,
+    STAGE_FIELDS,
+    TARGET_PROFILE_OBJECT_SCHEMA,
+)
 
 
 INVALID_STAGE_OUTPUT = "BLOCKED: INVALID_STAGE_OUTPUT"
@@ -48,6 +53,11 @@ PROPOSAL_FIELDS = frozenset(
 OPTIONAL_PROPOSAL_FIELDS = frozenset({"asset_state_changes"})
 OUTPUT_COMPONENTS = frozenset(REVIEWER_OUTPUT["components"])
 HASH_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+ASPECT_RATIO_PATTERN = re.compile(r"[1-9][0-9]*:[1-9][0-9]*\Z")
+TARGET_PROFILE_FIELDS = frozenset(TARGET_PROFILE_OBJECT_SCHEMA["required"])
+TARGET_PROFILE_MODES = frozenset(
+    TARGET_PROFILE_OBJECT_SCHEMA["properties"]["mode"]["enum"]
+)
 
 
 class WorkflowBlocked(ValueError):
@@ -74,6 +84,41 @@ def _is_span(value: Any) -> bool:
 
 def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and HASH_PATTERN.fullmatch(value) is not None
+
+
+def target_profile_declared_gate(target_profile: Any) -> bool:
+    """Derive the target-profile hard gate without coercing invalid input."""
+
+    if not isinstance(target_profile, dict) or set(target_profile) != TARGET_PROFILE_FIELDS:
+        return False
+    duration = target_profile.get("clip_duration_seconds")
+    mode = target_profile.get("mode")
+    return all(
+        (
+            _is_nonempty_string(target_profile.get("provider")),
+            _is_nonempty_string(target_profile.get("model")),
+            _is_nonempty_string(target_profile.get("model_version")),
+            isinstance(mode, str) and mode in TARGET_PROFILE_MODES,
+            isinstance(duration, (int, float))
+            and not isinstance(duration, bool)
+            and duration > 0,
+            isinstance(target_profile.get("aspect_ratio"), str)
+            and ASPECT_RATIO_PATTERN.fullmatch(target_profile["aspect_ratio"])
+            is not None,
+            isinstance(target_profile.get("reference_assets_available"), bool),
+        )
+    )
+
+
+def validate_target_profile_input(target_profile: Any) -> bool:
+    """Accept canonical null or a valid profile; reject malformed non-null data."""
+
+    if target_profile is None:
+        return False
+    declared = target_profile_declared_gate(target_profile)
+    if not declared:
+        raise WorkflowBlocked("BLOCKED: CONTRACT_ERROR")
+    return True
 
 
 def _normalized_source_lines(script: str) -> List[str]:
@@ -246,7 +291,7 @@ def apply_correction_proposals(
 def select_delivery_artifacts(delivery_status: str) -> Tuple[str, str, str]:
     if delivery_status in {"READY", "CONDITIONAL"}:
         script_artifact = "standardized-script"
-    elif delivery_status == "BLOCKED":
+    elif delivery_status in {"REWORK", "BLOCKED"}:
         script_artifact = "candidate-script"
     else:
         raise ValueError("unknown delivery status")
@@ -365,6 +410,10 @@ def parse_stage_output(payload: Any, stage_id: str) -> Dict[str, Any]:
             if not field.endswith("_findings")
         }
         if not isinstance(metrics, dict) or set(metrics) != expected_metrics:
+            raise ValueError
+        if stage_id == "stage5" and not isinstance(
+            metrics.get("target_profile_declared"), bool
+        ):
             raise ValueError
     except (KeyError, TypeError, ValueError):
         raise WorkflowBlocked(INVALID_STAGE_OUTPUT)

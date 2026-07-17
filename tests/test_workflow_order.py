@@ -72,6 +72,20 @@ def finding(**overrides):
     return record
 
 
+def valid_target_profile(**overrides):
+    profile = {
+        "provider": "OpenAI",
+        "model": "Sora",
+        "model_version": "2026-07",
+        "mode": "T2V",
+        "clip_duration_seconds": 8,
+        "aspect_ratio": "16:9",
+        "reference_assets_available": False,
+    }
+    profile.update(overrides)
+    return profile
+
+
 class WorkflowOrderTests(unittest.TestCase):
     def setUp(self):
         self.contract = load_contract(ROOT / "contracts/workflow-contract.json")
@@ -220,6 +234,91 @@ class WorkflowOrderTests(unittest.TestCase):
         artifacts = policy.select_delivery_artifacts("BLOCKED")
         self.assertIn("candidate-script", artifacts)
         self.assertNotIn("standardized-script", artifacts)
+
+    def test_rework_delivery_selects_candidate_and_never_standardized(self):
+        try:
+            artifacts = policy.select_delivery_artifacts("REWORK")
+        except ValueError as exc:
+            self.fail("REWORK must be a supported delivery status: {}".format(exc))
+        self.assertIn("candidate-script", artifacts)
+        self.assertNotIn("standardized-script", artifacts)
+
+    def test_target_profile_null_is_present_but_gate_is_false(self):
+        derive = getattr(policy, "target_profile_declared_gate", None)
+        require = getattr(policy, "validate_target_profile_input", None)
+        self.assertIsNotNone(derive, "target-profile gate derivation is required")
+        self.assertIsNotNone(require, "target-profile input validation is required")
+        self.assertFalse(derive(None))
+        self.assertFalse(require(None))
+
+    def test_valid_target_profile_sets_gate_true(self):
+        derive = getattr(policy, "target_profile_declared_gate", None)
+        require = getattr(policy, "validate_target_profile_input", None)
+        self.assertIsNotNone(derive, "target-profile gate derivation is required")
+        self.assertIsNotNone(require, "target-profile input validation is required")
+        profile = valid_target_profile()
+        self.assertTrue(derive(profile))
+        self.assertTrue(require(profile))
+
+    def test_invalid_non_null_target_profile_fails_closed(self):
+        derive = getattr(policy, "target_profile_declared_gate", None)
+        require = getattr(policy, "validate_target_profile_input", None)
+        self.assertIsNotNone(derive, "target-profile gate derivation is required")
+        self.assertIsNotNone(require, "target-profile input validation is required")
+        invalid_profiles = (
+            valid_target_profile(mode="unsupported"),
+            valid_target_profile(mode=[]),
+            valid_target_profile(aspect_ratio="0:9"),
+            valid_target_profile(extra="not allowed"),
+            {key: value for key, value in valid_target_profile().items() if key != "model"},
+        )
+        for profile in invalid_profiles:
+            with self.subTest(profile=profile):
+                try:
+                    derived = derive(profile)
+                except Exception as exc:
+                    self.fail("invalid profile must derive false, not error: {}".format(exc))
+                self.assertFalse(derived)
+                with self.assertRaisesRegex(
+                    policy.WorkflowBlocked, "BLOCKED: CONTRACT_ERROR"
+                ):
+                    require(profile)
+
+    def test_stage5_parser_accepts_boolean_target_profile_gate_and_exact_metrics(self):
+        metrics = {
+            "target_profile_declared": True,
+            "generation_risk_score": 2.0,
+            "anchor_coverage": 1.0,
+            "visual_nail_count": 1,
+            "negative_constraint_coverage": 1.0,
+            "high_risk_shots": 0,
+            "failure_mode_distribution": {},
+            "stage5_pass_rate": 1.0,
+        }
+        payload = {"finding": [], "correction_proposal": [], "metrics": metrics}
+        try:
+            parsed = policy.parse_stage_output(payload, "stage5")
+        except policy.WorkflowBlocked as exc:
+            self.fail("canonical Stage 5 metrics must parse: {}".format(exc))
+        self.assertEqual(payload, parsed)
+
+        for invalid_metrics in (
+            {key: value for key, value in metrics.items() if key != "target_profile_declared"},
+            dict(metrics, unexpected=True),
+            dict(metrics, target_profile_declared=1),
+        ):
+            with self.subTest(metrics=invalid_metrics):
+                with self.assertRaisesRegex(
+                    policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
+                ):
+                    policy.parse_stage_output(
+                        {
+                            "finding": [],
+                            "correction_proposal": [],
+                            "metrics": invalid_metrics,
+                        },
+                        "stage5",
+                    )
 
     def test_inferred_continuity_states_require_writer_decision(self):
         for state in ("blood", "displacement", "occlusion", "orientation"):
