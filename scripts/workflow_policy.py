@@ -93,7 +93,7 @@ def source_fragment(script: str, start_line: int, end_line: int) -> str:
     lines = _normalized_source_lines(script)
     if end_line > len(lines):
         raise ValueError("source span exceeds script line count")
-    return "\n".join(lines[start_line - 1 : end_line]).rstrip("\n")
+    return "\n".join(lines[start_line - 1 : end_line])
 
 
 def source_fragment_sha256(script: str, start_line: int, end_line: int) -> str:
@@ -181,23 +181,47 @@ def _proposal_conflicts(proposals: Sequence[Mapping[str, Any]]) -> bool:
     return False
 
 
+def _proposal_has_protected_state(proposal: Mapping[str, Any]) -> bool:
+    state_changes = proposal.get("asset_state_changes", {})
+    return isinstance(state_changes, dict) and any(
+        isinstance(state, str) and state in WRITER_DECISION_CONTINUITY_STATES
+        for state in state_changes.values()
+    )
+
+
+def _validate_proposals_against_snapshot(
+    script: str, proposals: Sequence[Mapping[str, Any]]
+) -> None:
+    stale = False
+    for item in proposals:
+        try:
+            span = item["source_span"]
+            actual = source_fragment_sha256(
+                script, span["start_line"], span["end_line"]
+            )
+            if actual != item["expected_source_sha256"]:
+                stale = True
+        except (KeyError, TypeError, ValueError):
+            stale = True
+    if stale:
+        raise WorkflowBlocked("BLOCKED: STALE_PATCH")
+
+
 def apply_correction_proposals(
     script: str, proposals: Sequence[Mapping[str, Any]]
 ) -> str:
     """Validate all proposals against one source snapshot, then apply bottom-up."""
 
-    if any(item.get("requires_writer_decision") is True for item in proposals):
+    _validate_proposals_against_snapshot(script, proposals)
+
+    if any(
+        item.get("requires_writer_decision") is True
+        or _proposal_has_protected_state(item)
+        for item in proposals
+    ):
         raise WorkflowBlocked("BLOCKED: WRITER_DECISION_REQUIRED")
     if _proposal_conflicts(proposals):
         raise WorkflowBlocked("BLOCKED: PATCH_CONFLICT")
-
-    for item in proposals:
-        span = item["source_span"]
-        actual = source_fragment_sha256(
-            script, span["start_line"], span["end_line"]
-        )
-        if actual != item["expected_source_sha256"]:
-            raise WorkflowBlocked("BLOCKED: STALE_PATCH")
 
     lines = _normalized_source_lines(script)
     ordered = sorted(
@@ -342,6 +366,10 @@ def parse_stage_output(payload: Any, stage_id: str) -> Dict[str, Any]:
         }
         if not isinstance(metrics, dict) or set(metrics) != expected_metrics:
             raise ValueError
+        if any(_proposal_has_protected_state(record) for record in proposals):
+            raise WorkflowBlocked("BLOCKED: WRITER_DECISION_REQUIRED")
+    except WorkflowBlocked:
+        raise
     except (KeyError, TypeError, ValueError):
         raise WorkflowBlocked(INVALID_STAGE_OUTPUT)
     return payload

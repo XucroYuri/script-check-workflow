@@ -49,7 +49,7 @@ finding:
 ### Source span、hash 与 ID 的确定性规则
 
 1. `source_span` 使用 1-based inclusive 行号；首行为 1，`start_line` 和 `end_line` 都包含在片段中。
-2. 从当前审查输入选择该行区间，将每一行的换行规范为 LF，然后用 `\n` 连接所选行；片段末尾不附加 terminal newline。
+2. 先把当前审查输入的 CRLF / CR 规范为 LF，并只排除文件末尾的一个 terminal record separator；再选择行区间并用 `\n` 连接所选记录，不额外追加 separator。若最后一个被选记录本身为空，连接结果会自然以 `\n` 结尾；该 LF 表示被选中的空记录，必须保留，不能 `rstrip`。
 3. `source_text_sha256` 和 `expected_source_sha256` 都是上述规范化片段 UTF-8 bytes 的 SHA-256，写成 64 位小写十六进制。
 4. 单次运行中先按 `start_line`、`end_line`、`rule_id`、原始 occurrence 的顺序稳定排序 findings，再从 `001` 起分配 occurrence。`finding_id` 格式为 `F-{stage_id}-{rule_id}-{location_id}-{occurrence}`，且在本次运行内唯一。
 5. 一条 finding 对应的 proposal 使用相同后缀，ID 格式为 `P-{stage_id}-{rule_id}-{location_id}-{occurrence}`。多个 finding 合并为一条 proposal 时，按排序后的首个 finding 生成 proposal ID，并在 `finding_ids` 中列出全部来源；proposal ID 在本次运行内唯一。
@@ -74,6 +74,10 @@ correction_proposal:
 Orchestrator 将以下任一情况视为提案冲突：`source_span` 重叠、`location_id` 相同，或 `affected_assets` 相交且提案要求不兼容的资产状态变化。冲突必须先记录并裁决，不能按返回顺序静默覆盖。
 
 应用提案前必须重新计算目标原始片段哈希。实际哈希与 `expected_source_sha256` 不一致时，立即返回 `BLOCKED: STALE_PATCH`；不得猜测新位置、模糊匹配或继续应用其余提案。
+
+应用顺序必须失败关闭：先针对同一份未修改的原始快照验证全部 proposal 的 `source_span` 和 `expected_source_sha256`；任何 span 非法、越界或 hash 不匹配都返回 `BLOCKED: STALE_PATCH`。只有全部快照验证通过后，才检查 writer decision 和 proposal 冲突。因此 `STALE_PATCH` 优先于 `WRITER_DECISION_REQUIRED` 与 `PATCH_CONFLICT`。
+
+`asset_state_changes` 中只要出现 `blood`、`displacement`、`occlusion` 或 `orientation` 分类，即视为受保护的连续性推断，必须返回 `BLOCKED: WRITER_DECISION_REQUIRED`。该规则独立于 reviewer 提供的 `requires_writer_decision`；即使该字段错误地为 `false`，也不得自动应用。
 
 ---
 

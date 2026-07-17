@@ -153,6 +153,33 @@ class WorkflowOrderTests(unittest.TestCase):
         with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
             policy.apply_correction_proposals("original", [stale])
 
+    def test_stale_hash_wins_over_writer_decision(self):
+        stale_and_protected = proposal(
+            expected_hash="f" * 64,
+            states={"prop": "blood"},
+            writer_decision=True,
+        )
+        with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
+            policy.apply_correction_proposals("original", [stale_and_protected])
+
+    def test_invalid_span_wins_over_conflict_and_writer_decision(self):
+        invalid = proposal(
+            start_line=0,
+            end_line=1,
+            states={"prop": "blood"},
+            writer_decision=True,
+        )
+        conflicting = proposal(
+            proposal_id="P-stage2-R2.5-S01-SH001-001",
+            finding_id="F-stage2-R2.5-S01-SH001-001",
+            start_line=1,
+            end_line=1,
+            expected_hash=policy.source_fragment_sha256("original", 1, 1),
+            states={"prop": "intact"},
+        )
+        with self.assertRaisesRegex(policy.WorkflowBlocked, "BLOCKED: STALE_PATCH"):
+            policy.apply_correction_proposals("original", [invalid, conflicting])
+
     def test_hash_matched_proposal_applies_to_the_inclusive_span(self):
         script = "first\r\nsecond\r\nthird"
         current_hash = policy.source_fragment_sha256(script, 2, 2)
@@ -175,6 +202,20 @@ class WorkflowOrderTests(unittest.TestCase):
         ):
             policy.apply_correction_proposals("original", [protected])
 
+    def test_false_flagged_blood_proposal_cannot_apply(self):
+        script = "original"
+        source_hash = policy.source_fragment_sha256(script, 1, 1)
+        protected = proposal(
+            expected_hash=source_hash,
+            states={"prop": "blood"},
+            writer_decision=False,
+        )
+        with self.assertRaisesRegex(
+            policy.WorkflowBlocked, "BLOCKED: WRITER_DECISION_REQUIRED"
+        ):
+            policy.apply_correction_proposals(script, [protected])
+        self.assertEqual("original", script)
+
     def test_blocked_delivery_selects_candidate_and_never_standardized(self):
         artifacts = policy.select_delivery_artifacts("BLOCKED")
         self.assertIn("candidate-script", artifacts)
@@ -188,14 +229,22 @@ class WorkflowOrderTests(unittest.TestCase):
             policy.continuity_state_requires_writer_decision("confirmed_broken")
         )
 
-    def test_source_fragment_hash_normalizes_lf_and_has_no_terminal_newline(self):
+    def test_source_fragment_hash_preserves_selected_blank_records(self):
         script = "alpha\r\nbeta\r\ngamma\r\n"
         self.assertEqual("beta\ngamma", policy.source_fragment(script, 2, 3))
         self.assertEqual(
             sha256("beta\ngamma".encode("utf-8")).hexdigest(),
             policy.source_fragment_sha256(script, 2, 3),
         )
-        self.assertEqual("alpha", policy.source_fragment("alpha\r\n\r\n", 1, 2))
+        trailing_blank = "alpha\r\n\r\n"
+        short_fragment = policy.source_fragment(trailing_blank, 1, 1)
+        long_fragment = policy.source_fragment(trailing_blank, 1, 2)
+        self.assertEqual("alpha", short_fragment)
+        self.assertEqual("alpha\n", long_fragment)
+        self.assertNotEqual(
+            policy.source_fragment_sha256(trailing_blank, 1, 1),
+            policy.source_fragment_sha256(trailing_blank, 1, 2),
+        )
 
     def test_finding_and_proposal_ids_are_deterministic_and_unique(self):
         records = [
@@ -258,6 +307,18 @@ class WorkflowOrderTests(unittest.TestCase):
             policy.WorkflowBlocked, "BLOCKED: INVALID_STAGE_OUTPUT"
         ):
             policy.parse_stage_output(invalid_metrics, "stage7")
+
+        false_flagged_blood = deepcopy(payload)
+        false_flagged_blood["correction_proposal"][0]["asset_state_changes"] = {
+            "prop": "blood"
+        }
+        false_flagged_blood["correction_proposal"][0][
+            "requires_writer_decision"
+        ] = False
+        with self.assertRaisesRegex(
+            policy.WorkflowBlocked, "BLOCKED: WRITER_DECISION_REQUIRED"
+        ):
+            policy.parse_stage_output(false_flagged_blood, "stage7")
 
     def test_documented_stage45_example_uses_canonical_separate_records(self):
         continuity = (ROOT / "references/stage4-5-asset-continuity.md").read_text(
