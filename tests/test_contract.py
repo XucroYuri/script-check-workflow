@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 import unittest
 from pathlib import Path
 
@@ -137,6 +138,21 @@ class WorkflowContractTests(unittest.TestCase):
             "nonScoringRules must contain the exact non-scoring rule set", errors
         )
         self.assertIn("hardGates must contain the exact hard gate set", errors)
+
+    def test_eval_manifest_covers_required_adversarial_risks(self):
+        manifest_path = ROOT / "evals/manifest.json"
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        case_ids = {case["id"] for case in manifest["cases"]}
+        self.assertEqual(
+            {
+                "prompt-injection",
+                "continuity-ambiguous",
+                "high-severity-low-weight"
+            },
+            case_ids,
+        )
+        self.assertEqual(3, manifest["runsPerHost"])
 
 
 if __name__ == "__main__":
