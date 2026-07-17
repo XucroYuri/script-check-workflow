@@ -224,7 +224,7 @@ Stage 4.5 必须输出 `asset-continuity-ledger` 条目，并把每条推断明�
 
 ### Step 9: 合成候选稿
 
-只在 `expected_source_sha256` 与原始片段一致时应用提案。所有提案应用完成后生成 `candidate-script`，但此时不得评分、评级或命名为 `standardized-script`。
+只在 `expected_source_sha256` 与原始片段一致时应用提案。所有提案应用完成后生成 `candidate-script`，但此时不得计算分数、确定交付状态或命名为 `standardized-script`。
 
 ### Step 10: 候选稿完整复审
 
@@ -247,7 +247,7 @@ Orchestrator 对候选稿中的每个镜头逐一执行终审 12 问：
 
 对每镜标记：
 
-- ✅ 免检
+- ✅ 通过
 - ⚠️ 需微调
 - ❌ 需重改
 

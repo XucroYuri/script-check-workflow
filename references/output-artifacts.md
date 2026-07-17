@@ -146,14 +146,14 @@
 - `delivery_status`
 - `hard_gate_results`
 - `original_baseline`：原稿首次审查的 findings、metrics 及可选基线分数，仅用于修改前对照
-- `candidate_final`：最终候选稿完整复审的 findings、metrics、终审结果、硬门槛结果及通过门槛后的分数与评级
+- `candidate_final`：最终候选稿完整复审的 findings、metrics、终审结果、硬门槛结果、分数及交付状态
 - 总分（仅来自 `candidate_final`）
-- 评级（仅来自 `candidate_final`）
+- 交付状态（仅来自 `candidate_final`，为 `READY`、`CONDITIONAL`、`REWORK` 或 `BLOCKED`）
 - 场景数
 - 镜头数
 - 高 / 中 / 低严重性问题数
 
-diagnostics 必须同时包含 `original_baseline` 和 `candidate_final`，但只有 `candidate_final` 控制交付状态。不得用 `original_baseline` 的通过率、问题数、分数或评级覆盖候选稿结论。
+diagnostics 必须同时包含 `original_baseline` 和 `candidate_final`，但只有 `candidate_final` 控制交付状态。不得用 `original_baseline` 的通过率、问题数、分数或交付状态覆盖候选稿结论。
 
 诊断还必须记录：
 

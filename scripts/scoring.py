@@ -18,7 +18,13 @@ def compute_score(
     for rule_id, weight in weights.items():
         applicable = rule_results[rule_id]["applicable"]
         passed = rule_results[rule_id]["passed"]
-        if applicable < 0 or passed < 0 or passed > applicable:
+        if (
+            type(applicable) is not int
+            or type(passed) is not int
+            or applicable < 0
+            or passed < 0
+            or passed > applicable
+        ):
             raise ValueError("invalid counts for " + rule_id)
         if applicable == 0:
             continue
@@ -36,6 +42,8 @@ def classify_delivery(
     expected = set(contract["scoring"]["hardGates"])
     if set(gates) != expected:
         raise ValueError("gate IDs must exactly match contract hard gates")
+    if any(not isinstance(value, bool) for value in gates.values()):
+        raise ValueError("gate values must be booleans")
     if not all(gates.values()):
         return "BLOCKED"
     if score >= 90.0:

@@ -45,16 +45,44 @@ class ScoringTests(unittest.TestCase):
             compute_score(self.contract, results)
 
     def test_rule_result_ids_must_exactly_match_contract(self):
-        results = dict(self.all_pass)
-        del results["R1.1"]
-        with self.assertRaises(ValueError):
-            compute_score(self.contract, results)
+        missing = dict(self.all_pass)
+        del missing["R1.1"]
+        extra = dict(self.all_pass)
+        extra["R99.99"] = {"applicable": 1, "passed": 1}
+
+        for name, results in (("missing", missing), ("extra", extra)):
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    compute_score(self.contract, results)
 
     def test_gate_ids_must_exactly_match_contract(self):
-        gates = dict(self.gates)
-        del gates["input_budget_valid"]
-        with self.assertRaises(ValueError):
-            classify_delivery(self.contract, 100.0, gates)
+        missing = dict(self.gates)
+        del missing["input_budget_valid"]
+        extra = dict(self.gates)
+        extra["unknown_gate"] = True
+
+        for name, gates in (("missing", missing), ("extra", extra)):
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    classify_delivery(self.contract, 100.0, gates)
+
+    def test_gate_values_must_be_booleans(self):
+        for value in ("false", 0, 1, None):
+            with self.subTest(value=value):
+                gates = dict(self.gates)
+                gates["contract_valid"] = value
+                with self.assertRaises(ValueError):
+                    classify_delivery(self.contract, 100.0, gates)
+
+    def test_rule_counts_must_be_non_boolean_integers(self):
+        for field in ("applicable", "passed"):
+            for value in (True, False, 1.0, "1", None):
+                with self.subTest(field=field, value=value):
+                    results = dict(self.all_pass)
+                    results["R1.1"] = {"applicable": 1, "passed": 1}
+                    results["R1.1"][field] = value
+                    with self.assertRaises(ValueError):
+                        compute_score(self.contract, results)
 
     def test_no_applicable_rules_raise(self):
         results = {
