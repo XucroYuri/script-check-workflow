@@ -1,0 +1,46 @@
+{
+  "defaultMode": "acceptEdits",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(python:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(sort:*)",
+      "Bash(date:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(sleep:*)",
+      "Bash(curl:*)",
+      "Bash(gh:*)",
+      "Agent",
+      "WebSearch",
+      "WebFetch",
+      "LSP",
+      "Skill",
+      "TodoWrite",
+      "AskUserQuestion"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(rm -r:*)",
+      "Bash(> /dev:*)",
+      "Bash(> /etc:*)",
+      "Bash(sudo:*)",
+      "Bash(chown:*)"
+    ]
+  }
+}
