@@ -2,3 +2,5 @@
 .superpowers/
 .worktrees/
 .omc/
+.claude/
+!.claude/settings.json
