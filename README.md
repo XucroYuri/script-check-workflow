@@ -309,16 +309,3 @@ Use $script-check-workflow to 解释这个技能会输出什么，以及什么�
 
 [![Star History Chart](https://api.star-history.com/svg?repos=XucroYuri/script-check-workflow&type=Date)](https://star-history.com/#XucroYuri/script-check-workflow&Date)
 
-## 支持项目
-
-<!-- SUPPORT-PROJECT:START -->
-如果这个项目对你有帮助，可以自愿赞赏支持后续维护。赞赏不是付费咨询服务，也不构成任何结果承诺；请不要在转账备注中填写姓名、手机号、证件号等敏感信息。
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/XucroYuri/lever-gaokao/d012783796ee288ae7c934cf5848ee8ffcd2b773/docs/assets/sponsor/alipay-card.png" alt="支付宝赞助二维码" width="260">
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/XucroYuri/lever-gaokao/d012783796ee288ae7c934cf5848ee8ffcd2b773/docs/assets/sponsor/wechat-reward-card.png" alt="微信赞赏二维码" width="260">
-</p>
-
-<p align="center"><strong>时不我待，功不唐捐</strong></p>
-<!-- SUPPORT-PROJECT:END -->
